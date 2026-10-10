@@ -1,0 +1,98 @@
+# Model registry. Prices are USD per 1M tokens, written as strings so they parse to exact Decimals.
+# Verify prices against each provider's pricing page before relying on cost numbers.
+models:
+  groq-llama-8b:
+    provider: groq
+    upstream_model: llama-3.1-8b-instant
+    input_price_per_mtok: "0.05"
+    output_price_per_mtok: "0.08"
+    context_window: 131072
+    tier: cheap
+    fallbacks: [or-llama-8b, gemini-flash-lite]
+
+  groq-llama-70b:
+    provider: groq
+    upstream_model: llama-3.3-70b-versatile
+    input_price_per_mtok: "0.59"
+    output_price_per_mtok: "0.79"
+    context_window: 131072
+    tier: strong
+    fallbacks: [or-llama-70b, gemini-flash]
+
+  gemini-flash-lite:
+    provider: gemini
+    upstream_model: gemini-3.1-flash-lite  # 2.5-flash-lite is closed to new API users
+    input_price_per_mtok: "0.25"
+    output_price_per_mtok: "1.50"
+    context_window: 1048576
+    tier: cheap
+    supports_vision: true
+    fallbacks: [or-llama-8b]
+
+  gemini-flash:
+    provider: gemini
+    upstream_model: gemini-2.5-flash
+    input_price_per_mtok: "0.30"
+    output_price_per_mtok: "2.50"
+    context_window: 1048576
+    tier: strong
+    supports_vision: true
+    fallbacks: [or-llama-70b]
+
+  gpt-4o-mini:
+    provider: openai
+    upstream_model: gpt-4o-mini
+    input_price_per_mtok: "0.15"
+    output_price_per_mtok: "0.60"
+    context_window: 128000
+    tier: cheap
+    supports_vision: true
+    fallbacks: [groq-llama-8b]
+
+  claude-haiku:
+    provider: anthropic
+    upstream_model: claude-haiku-4-5
+    input_price_per_mtok: "1.00"
+    output_price_per_mtok: "5.00"
+    context_window: 200000
+    tier: strong
+    supports_vision: true
+    supports_json: false
+    fallbacks: [gemini-flash]
+
+  or-llama-8b:
+    provider: openrouter
+    upstream_model: meta-llama/llama-3.1-8b-instruct
+    input_price_per_mtok: "0.05"
+    output_price_per_mtok: "0.08"
+    context_window: 131072
+    tier: cheap
+    fallbacks: [gemini-flash-lite]
+
+  or-llama-70b:
+    provider: openrouter
+    upstream_model: meta-llama/llama-3.3-70b-instruct
+    input_price_per_mtok: "0.22"
+    output_price_per_mtok: "0.50"
+    context_window: 131072
+    tier: strong
+    fallbacks: [gemini-flash]
+
+  # Free on OpenRouter but heavily rate-limited; good for demos, not load tests.
+  or-gemma-free:
+    provider: openrouter
+    upstream_model: google/gemma-4-31b-it:free
+    input_price_per_mtok: "0"
+    output_price_per_mtok: "0"
+    context_window: 262144
+    tier: cheap
+    fallbacks: [gemini-flash-lite]
+
+  # Optional local model (set OLLAMA_BASE_URL). Free, so cost is always $0.
+  ollama-llama-8b:
+    provider: ollama
+    upstream_model: llama3.1:8b
+    input_price_per_mtok: "0"
+    output_price_per_mtok: "0"
+    context_window: 131072
+    tier: cheap
