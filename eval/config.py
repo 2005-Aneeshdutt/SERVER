@@ -35,8 +35,10 @@ JUDGE = ModelSpec(
     context_window=1_048_576,
     tier="strong",
 )
-# Prompts judged twice with the answer order swapped, to measure position bias.
-CONSISTENCY_SAMPLE = 200
+# Prompts judged a second time with the answer order swapped. First run: 200 (to measure
+# position bias: 75% consistent). With single-order labels the classifier barely beat the base
+# rate, so every prompt is now judged both ways and order-dependent verdicts count as ties.
+CONSISTENCY_SAMPLE = N_PROMPTS
 
 TEST_FRACTION = 0.2
 
