@@ -60,3 +60,9 @@ and keep working.
 
 Headers: `X-RateLimit-Limit` / `-Remaining` (RPM), `X-RateLimit-Limit-Tokens` /
 `-Remaining-Tokens` (TPM), and `Retry-After` on 429.
+
+**Forward steps** (also seen on Docker Desktop: Redis's clock jumped ~20 s mid-burst) are
+indistinguishable from real elapsed time, so the bucket refills. That's inherent to any
+time-based limiter. The over-admission is bounded by one bucket's capacity, because refill caps
+at `limit`. The multi-replica tests compare Redis's clock with wall time around each burst and
+retry bursts that straddle a jump, so they test the limiter, not the dev VM's clock.
