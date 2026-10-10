@@ -15,4 +15,6 @@ async def list_models(container: ContainerDep, key: KeyDep) -> dict[str, Any]:
         for spec in container.registry.all()
         if spec.provider in container.providers and key.may_use(spec.alias)
     ]
+    if container.router is not None and key.may_use("auto"):
+        data.insert(0, {"id": "auto", "object": "model", "created": 0, "owned_by": "gateway"})
     return {"object": "list", "data": data}

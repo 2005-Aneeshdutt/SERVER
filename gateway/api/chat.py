@@ -34,6 +34,7 @@ from gateway.core import tokens
 from gateway.core.auth import ApiKeyRecord
 from gateway.core.errors import (
     GatewayError,
+    InvalidRequest,
     ModelNotAllowed,
     ModelNotFound,
     ProviderError,
@@ -54,6 +55,7 @@ from gateway.observability.metrics import (
 )
 from gateway.observability.request_log import RequestRecord
 from gateway.routing.dispatch import DispatchTrace
+from gateway.routing.smart import AUTO, RouteDecision
 
 log = logging.getLogger(__name__)
 router = APIRouter()
@@ -78,6 +80,7 @@ class Guards:
     lock_token: str | None = None  # set if we lead an in-flight cache miss
     cache_status: str = "BYPASS"  # HIT | MISS | BYPASS
     rate_headers: dict[str, str] = field(default_factory=dict)
+    route: RouteDecision | None = None  # model="auto" only
     finished: bool = False
 
 
@@ -107,13 +110,18 @@ class Outcome:
 async def chat_completions(
     body: ChatRequest, request: Request, container: ContainerDep, key: KeyDep
 ) -> Response:
-    spec = container.registry.get(body.model)
-    if not key.may_use(spec.alias):
-        raise ModelNotAllowed(f"This key is not allowed to use {spec.alias!r}")
+    if body.model == AUTO:
+        if container.router is None:
+            raise InvalidRequest("model 'auto' is not enabled on this gateway")
+        spec = container.router.strong  # placeholder until the request is routed
+    else:
+        spec = container.registry.get(body.model)
+    if not key.may_use(body.model):
+        raise ModelNotAllowed(f"This key is not allowed to use {body.model!r}")
     call = CallContext(
         request_id=uuid.uuid4(),
         key=key,
-        requested_alias=spec.alias,
+        requested_alias=body.model,
         trace=DispatchTrace(spec=spec),
         stream=body.stream,
         started=time.perf_counter(),
@@ -142,10 +150,22 @@ async def _handle(
         call.guards.cache_status = "MISS"
     else:
         CACHE_LOOKUPS.labels("bypass").inc()
+    if call.requested_alias == AUTO:
+        await _route(container, body, call)  # after the cache: a hit needs no routing
     await _reserve(container, body, call, prompt_tokens)
     if body.stream:
         return await _stream(container, body, call)
     return await _complete(container, body, call)
+
+
+async def _route(container: Container, body: ChatRequest, call: CallContext) -> None:
+    assert container.router is not None
+    remaining = None
+    if call.key.monthly_spend_cap_usd is not None:
+        remaining = await container.spend.remaining(call.key)
+    decision = await container.router.route(body, call.key, remaining)
+    call.trace.spec = decision.spec
+    call.guards.route = decision
 
 
 # ---- limits --------------------------------------------------------------------------------
@@ -362,6 +382,7 @@ def _headers(call: CallContext, cost: Decimal | None) -> dict[str, str]:
         "X-Gateway-Attempts": str(call.trace.attempts),
         "X-Cache": call.guards.cache_status,
         **call.guards.rate_headers,
+        **(call.guards.route.headers() if call.guards.route else {}),
     }
     if cost is not None:
         headers["X-Gateway-Cost-USD"] = format(cost, ".10f")
@@ -411,6 +432,8 @@ async def _finish(container: Container, call: CallContext, outcome: Outcome) -> 
             error_type=outcome.error_type,
             fallback_count=call.trace.fallback_count,
             created_at=call.created_at,
+            route=guards.route.route if guards.route else None,
+            route_probability=guards.route.probability if guards.route else None,
         )
     )
     _observe(call, outcome, latency_s)
