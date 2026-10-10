@@ -61,3 +61,11 @@ KEY_STORE_STALE = Counter(
 REPLICA_FALLBACKS = Counter(
     "gateway_replica_fallbacks_total", "Read-replica queries that fell back to the primary"
 )
+ROUTER_DECISIONS = Counter(
+    "gateway_router_decisions_total", "model=auto routing decisions", ["route", "reason"]
+)
+ROUTER_LATENCY = Histogram(
+    "gateway_router_latency_seconds",
+    "Time to make a model=auto routing decision (incl. prompt embedding)",
+    buckets=(0.002, 0.005, 0.01, 0.02, 0.03, 0.05, 0.075, 0.1, 0.2, 0.5),
+)
