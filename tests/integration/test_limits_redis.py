@@ -134,7 +134,12 @@ async def test_concurrent_reservations_never_exceed_cap(redis: Redis) -> None:
     for limiter in limiters:
         await limiter._redis.aclose()
     assert sum(1 for r in results if not isinstance(r, BaseException)) == 14  # 1 // 0.07
-    assert all(isinstance(r, SpendCapExceeded) for r in results if isinstance(r, BaseException))
+    unexpected = [
+        repr(r)
+        for r in results
+        if isinstance(r, BaseException) and not isinstance(r, SpendCapExceeded)
+    ]
+    assert not unexpected, unexpected
 
 
 # ---- fail closed ---------------------------------------------------------------------------
