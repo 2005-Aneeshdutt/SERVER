@@ -13,11 +13,13 @@ import sys
 from collections.abc import Sequence
 from typing import Any
 
+from eval import jsonl
 from eval.chart import Marker, Series, render
 from eval.config import (
     CHART_FILE,
     CHEAP_ALIAS,
     JUDGE,
+    JUDGMENTS_FILE,
     RESULTS_FILE,
     ROUTER_ARTIFACT,
     SEED,
@@ -31,6 +33,7 @@ from eval.train import (
     Trained,
     heuristic_score,
     predict,
+    selection_study,
     stratified_split,
     train_classifier,
 )
@@ -91,6 +94,7 @@ def main() -> None:
     split = stratified_split(examples)
     vectors = embed_examples(examples)
     trained = train_classifier(split.train, vectors)
+    study = selection_study(split.train, vectors)
     test = split.test
     clf_scores = [predict(trained, vectors[e.id]) for e in test]
     heur_scores = [heuristic_score(e) for e in test]
@@ -122,7 +126,8 @@ def main() -> None:
         encoding="utf-8",
     )
     RESULTS_FILE.write_text(
-        report(examples, split.train, test, results, diff, settings, trained), encoding="utf-8"
+        report(examples, split.train, test, results, diff, settings, trained, study),
+        encoding="utf-8",
     )
     print(
         f"APGR classifier {results[0]['apgr']:.3f} vs heuristic {results[1]['apgr']:.3f} "
@@ -138,6 +143,7 @@ def report(
     diff: tuple[float, float, float],
     settings: dict[str, Point],
     trained: Trained,
+    study: Sequence[tuple[str, float, float | None]],
 ) -> str:
     agree, pairs = swap_consistency()
     n_test = len(test)
@@ -145,6 +151,7 @@ def report(
     strong_cost = sum(e.strong_cost for e in test)
     cheap_cost = sum(e.cheap_cost for e in test)
     labelling_cost = sum(e.cheap_cost + e.strong_cost for e in examples)
+    judge_cost = sum(float(j["cost_usd"]) for j in jsonl.read(JUDGMENTS_FILE))
     lines = [
         "# Routing evaluation",
         "",
@@ -202,8 +209,39 @@ def report(
         f"| always cheap | — | 0% | {q_cheap:.1%} | {cheap_cost / strong_cost:.0%} |",
         "| always strong | — | 100% | 100% | 100% |",
         "",
-        f"Total labelling spend (generations; judge cost excluded): ${labelling_cost:.2f}. "
-        "Costs are OpenRouter's billed amounts per call.",
+        "## Model selection (5-fold CV on the training split only)",
+        "",
+        "Logistic regression was fixed in the plan. After the first test result, this study "
+        "checked, using training data only, whether another model would have been better. "
+        "None is by more than noise, so the simplest servable model stays.",
+        "",
+        "| Candidate | Out-of-fold APGR | Log loss |",
+        "|---|---|---|",
+        *[
+            f"| {name} | {score:.3f} | {'—' if loss is None else f'{loss:.4f}'} |"
+            for name, score, loss in study
+        ],
+        "",
+        "## Interpretation",
+        "",
+        "- **The prompt carries little signal about whether the 8B answer will match the 70B "
+        "answer.** Every router recovers only a few points more of the quality gap than random "
+        "routing, and the classifier's log loss is barely below the base rate's. The two models "
+        "are the same family trained on similar data, so they tend to succeed and fail on the "
+        "same prompts. The differences are idiosyncratic per answer, not predictable from the "
+        "prompt.",
+        f"- **Label noise caps what any router can learn:** {100 - agree * 100 // max(pairs, 1)}% "
+        "of verdicts flip when the answer order is swapped.",
+        "- This matches RouteLLM's finding that routers trained only on Chatbot Arena "
+        "preferences perform close to random, and need augmented or in-domain labels to help.",
+        "- **What would move the result** (each costs a few dollars of labelling; the pipeline "
+        "and caches support all three):",
+        "  1. a model pair with a larger quality gap (e.g. 8B vs a frontier model);",
+        "  2. more labels, plus in-domain data;",
+        "  3. graded (1-10) judge scores instead of pairwise ties.",
+        "",
+        f"Labelling cost (per-call `cost` reported by OpenRouter): generations "
+        f"${labelling_cost:.2f}, judge ${judge_cost:.2f}.",
     ]
     return "\n".join(lines) + "\n"
 
