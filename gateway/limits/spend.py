@@ -75,6 +75,11 @@ class SpendLimiter(Protocol):
 
     async def settle(self, reservation: Reservation, actual_usd: Decimal) -> None: ...
 
+    async def remaining(self, key: ApiKeyRecord) -> Decimal | None:
+        """Cap minus settled minus reserved, or None if uncapped/unknown. Advisory only
+        (used for routing); enforcement is always the atomic reserve()."""
+        ...
+
 
 class RedisSpendLimiter:
     def __init__(
@@ -132,6 +137,21 @@ class RedisSpendLimiter:
             raise LimiterUnavailable("Spend ledger unavailable; try again shortly.") from exc
         # NX: if another replica hydrated first, keep its value (and anything settled since).
         await self._redis.set(spent_key, to_nanos(spent, round_up=False), nx=True, px=_KEY_TTL_MS)
+
+    async def remaining(self, key: ApiKeyRecord) -> Decimal | None:
+        cap = key.monthly_spend_cap_usd
+        if cap is None:
+            return None
+        month, _, _ = month_bounds(datetime.now(UTC))
+        spent_key, _, _, reserved_key = self._keys(key.id, month)
+        try:
+            spent, reserved = await self._redis.mget(spent_key, reserved_key)
+        except RedisError:
+            REDIS_ERRORS.labels(component="spend_limiter").inc()
+            return None
+        if spent is None:
+            return None  # not hydrated yet this month: unknown
+        return cap - from_nanos(int(spent) + int(reserved or 0))
 
     async def settle(self, reservation: Reservation, actual_usd: Decimal) -> None:
         keys = self._keys(reservation.key_id, reservation.month)
