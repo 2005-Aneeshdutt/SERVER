@@ -71,7 +71,7 @@ plugins = ["pydantic.mypy"]
 files = ["gateway", "tests", "scripts", "eval"]
 
 [[tool.mypy.overrides]]
-module = ["tiktoken.*", "respx.*", "sentence_transformers.*", "sklearn.*", "numpy.*"]
+module = ["tiktoken.*", "respx.*", "torch.*", "sentence_transformers.*", "sklearn.*", "numpy.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
