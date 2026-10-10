@@ -1,0 +1,32 @@
+# Load-test overlay:
+#   docker compose -f docker-compose.yml -f loadtest/docker-compose.loadtest.yml up -d --scale api=N
+# Points the "openai" provider at a local mock and BLANKS every real provider key, so a load
+# test can never reach (or bill) a real provider, even through a fallback chain.
+services:
+  api:
+    environment:
+      OPENAI_BASE_URL: http://mock-llm:9000/v1
+      OPENAI_API_KEY: mock-key
+      GROQ_API_KEY: ""
+      GEMINI_API_KEY: ""
+      OPENROUTER_API_KEY: ""
+      ANTHROPIC_API_KEY: ""
+      OLLAMA_BASE_URL: ""
+    depends_on:
+      mock-llm:
+        condition: service_started
+
+  mock-llm:
+    build: .
+    command: ["uvicorn", "mock_llm:app", "--app-dir", "/loadtest", "--host", "0.0.0.0", "--port", "9000", "--workers", "4", "--no-access-log"]
+    volumes:
+      - ./loadtest:/loadtest:ro
+    environment:
+      MOCK_LATENCY_MS: "100"
+
+  k6:
+    image: grafana/k6:1.0.0
+    profiles: ["tools"]  # only started via `docker compose run k6 ...`
+    volumes:
+      - ./loadtest:/loadtest:ro
+      - ./loadtest/results:/results
