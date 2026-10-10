@@ -4,8 +4,10 @@ Tests build a Container directly with fakes (in-memory key store, mocked upstrea
 """
 
 import asyncio
+import logging
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from redis.asyncio import Redis
 from sqlalchemy import text
@@ -30,7 +32,9 @@ from gateway.providers.factory import build_providers, make_http_client
 from gateway.routing.breaker import Breaker, BreakerConfig, RedisCircuitBreaker
 from gateway.routing.dispatch import Dispatcher, RetryPolicy
 from gateway.routing.registry import ModelRegistry
+from gateway.routing.smart import RouterModel, SmartRouter
 
+log = logging.getLogger(__name__)
 ReadinessCheck = Callable[[], Awaitable[None]]
 
 
@@ -48,6 +52,7 @@ class Container:
     cache: ResponseCache
     admin_keys: SqlKeyStore | None = None  # None in unit tests (admin API then 503s)
     usage_reader: SqlUsageReader | None = None
+    router: SmartRouter | None = None  # model="auto"; None if the router isn't installed
     # name -> coroutine that raises if the dependency is unhealthy (used by /readyz)
     readiness: dict[str, ReadinessCheck] = field(default_factory=dict)
     closers: list[Callable[[], Awaitable[None]]] = field(default_factory=list)
@@ -106,6 +111,7 @@ async def build_container(settings: Settings) -> Container:
     breaker = RedisCircuitBreaker(redis, _breaker_config(settings))
     key_store = SqlKeyStore(sessions)
     await asyncio.to_thread(tokens.warm_up)
+    router = await build_router(settings, registry, breaker)
     return Container(
         settings=settings,
         registry=registry,
@@ -123,6 +129,7 @@ async def build_container(settings: Settings) -> Container:
         ),
         admin_keys=key_store,
         usage_reader=SqlUsageReader(sessions, replica_sessions),
+        router=router,
         readiness={
             "redis": _redis_check(redis),
             "postgres": _postgres_check(engine),
@@ -133,8 +140,39 @@ async def build_container(settings: Settings) -> Container:
             engine.dispose,
             redis.aclose,
             *([replica_engine.dispose] if replica_engine else []),
+            *([_closer(router.close)] if router else []),
         ],
     )
+
+
+async def build_router(
+    settings: Settings, registry: ModelRegistry, breaker: Breaker
+) -> SmartRouter | None:
+    """model="auto" is enabled only if the classifier artifact exists and the optional
+    `router` extra (torch + sentence-transformers) is installed."""
+    path = Path(settings.router_model_path)
+    if not await asyncio.to_thread(path.exists):
+        log.warning("model=auto disabled: no router model at %s", path)
+        return None
+    try:
+        from gateway.routing.embedder import BgeEmbedder
+
+        embedder = await asyncio.to_thread(BgeEmbedder, threads=settings.router_threads)
+    except ImportError:
+        log.warning("model=auto disabled: install the 'router' extra")
+        return None
+    router = SmartRouter(
+        RouterModel.load(path), embedder, registry, breaker, settings.default_max_tokens
+    )
+    await router.warm_up()
+    return router
+
+
+def _closer(close: Callable[[], None]) -> Callable[[], Awaitable[None]]:
+    async def run() -> None:
+        close()
+
+    return run
 
 
 def _redis_check(redis: Redis) -> ReadinessCheck:
