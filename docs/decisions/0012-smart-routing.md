@@ -74,3 +74,39 @@ thread, so it never blocks the event loop, and a cache hit or a hard rule skips 
   Request logs store `route` and `route_probability` for the dashboard (M4).
 - The classifier is specific to this model pair. Changing either model means relabelling, which
   costs about $1.30 for 2,000 prompts with the caches.
+
+## Result: an honest negative
+On the held-out test set (400 prompts), the classifier and the length/code/math heuristic both
+recover only a little more of the quality gap than random routing. The APGR numbers:
+
+| Router | APGR |
+|---|---|
+| classifier | 0.537 |
+| heuristic | 0.532 |
+| random | ~0.5 |
+
+The classifier minus the heuristic is **+0.005, with a 95% bootstrap CI of −0.028 to +0.037**.
+**The spec's "beats the heuristic" criterion is not met.** A model-selection study on the
+training split (MLP, kNN, embeddings + features) found nothing better than noise either.
+
+What we did about it:
+- **Cleaner labels:** every prompt was judged in both orders, with disagreements counted as ties.
+  This moved the base rate from 35% to 46%, but not the conclusion.
+- **No test-set shopping:** alternatives were compared by cross-validation on train only, and
+  everything is published, including the null result.
+
+Why the signal is weak:
+- Llama 8B and 70B come from the same family and tend to succeed and fail on the same prompts.
+  Their differences are per answer, not predictable from the prompt.
+- 27% of judge verdicts are order-dependent.
+
+RouteLLM reported the same pattern for routers trained only on Arena preferences.
+
+What would change it is labelled more cheaply than it's argued about: a pair with a larger
+quality gap, more in-domain labels, or graded judge scores. The pipeline supports all three at a
+few dollars each.
+
+The **infrastructure** (rules, the classifier hook, per-key thresholds, headers, logging, the
+reproducible eval) is what this milestone delivers. The served thresholds still give the
+documented trade-offs: `balanced` keeps 85% of answers as good as the strong model at 75% of
+always-strong cost.
