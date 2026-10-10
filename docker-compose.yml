@@ -12,6 +12,8 @@ services:
       - api
 
   api:
+    # api and migrate share one image tag, so migrations always match the code.
+    image: llm-gateway:local
     build: .
     env_file:
       - path: .env
@@ -35,6 +37,7 @@ services:
         condition: service_healthy
 
   migrate:
+    image: llm-gateway:local
     build: .
     command: ["alembic", "upgrade", "head"]
     environment:
