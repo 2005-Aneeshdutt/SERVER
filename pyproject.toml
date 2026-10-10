@@ -19,7 +19,13 @@ dependencies = [
     "prometheus-client>=0.20",
 ]
 
+[project.optional-dependencies]
+# Smart routing (`model: "auto"`): prompt embeddings on CPU at request time.
+router = ["sentence-transformers>=3.0"]
+
 [dependency-groups]
+# Offline routing evaluation: dataset labelling, classifier training, cost/quality curves.
+eval = ["scikit-learn>=1.5"]
 dev = [
     "pytest>=8.3",
     "pytest-asyncio>=0.24",
@@ -29,6 +35,18 @@ dev = [
     "types-pyyaml>=6.0",
     "openai>=1.40",
 ]
+
+[tool.uv]
+default-groups = ["dev"]
+
+# CPU-only PyTorch for sentence-transformers (the default wheel bundles ~2 GB of CUDA).
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu" }]
 
 [build-system]
 requires = ["hatchling"]
@@ -50,10 +68,10 @@ ignore = ["N818"]
 python_version = "3.12"
 strict = true
 plugins = ["pydantic.mypy"]
-files = ["gateway", "tests", "scripts"]
+files = ["gateway", "tests", "scripts", "eval"]
 
 [[tool.mypy.overrides]]
-module = ["tiktoken.*", "respx.*"]
+module = ["tiktoken.*", "respx.*", "sentence_transformers.*", "sklearn.*", "numpy.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
