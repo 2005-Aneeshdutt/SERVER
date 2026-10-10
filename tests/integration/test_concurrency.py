@@ -1,19 +1,24 @@
 """Correctness under concurrency, through 3 gateway instances sharing one real Redis."""
 
 import asyncio
+import time
 import uuid
+from collections.abc import Awaitable
 from decimal import Decimal
-from typing import Any
+from typing import Any, TypeVar
 
 import httpx
 import pytest
 import respx
+from redis.asyncio import Redis
 
 from gateway.core.auth import ApiKeyRecord
+from gateway.core.config import Settings
 from tests.helpers import GROQ_URL, openai_completion
 from tests.integration.conftest import Replicas
 
 pytestmark = pytest.mark.integration
+T = TypeVar("T")
 
 BODY = {
     "model": "groq-llama-8b",
@@ -47,15 +52,43 @@ async def fire(
     )
 
 
+async def redis_clock_skew_s[T](coro: Awaitable[T]) -> tuple[T, float]:
+    """Run `coro`; return its result and how far Redis's clock moved beyond wall time.
+
+    Token buckets refill from Redis TIME. Docker Desktop's VM clock occasionally steps forward
+    by many seconds; the limiter then (correctly) treats that as elapsed time and refills. That
+    is a property of the dev VM, not the limiter, so bursts that straddle a jump are retried.
+    """
+    redis = Redis.from_url(Settings().redis_url)
+    try:
+        (s0, us0), wall0 = await redis.time(), time.perf_counter()
+        result = await coro
+        (s1, us1), wall1 = await redis.time(), time.perf_counter()
+    finally:
+        await redis.aclose()
+    redis_elapsed = (s1 - s0) + (us1 - us0) / 1e6
+    return result, redis_elapsed - (wall1 - wall0)
+
+
+async def burst(
+    clients: list[httpx.AsyncClient], raw_keys: list[str], n: int
+) -> list[httpx.Response]:
+    """Fire `n` requests, retrying with the next fresh key if Redis's clock jumped meanwhile."""
+    for raw in raw_keys:
+        responses, skew = await redis_clock_skew_s(fire(clients, raw, n))
+        if abs(skew) < 0.5:
+            return responses
+    pytest.skip("Redis clock kept jumping during bursts (Docker Desktop time sync)")
+
+
 async def test_rpm_limit_holds_across_three_replicas(
     replicas: tuple[Replicas, respx.Router],
 ) -> None:
     start, upstream = replicas
     upstream.post(GROQ_URL).mock(return_value=httpx.Response(200, json=openai_completion()))
-    raw, record = key(rpm=10)
-    clients = await start(3, [(raw, record)])
-
-    responses = await fire(clients, raw, 60)
+    keys = [key(rpm=10) for _ in range(3)]  # a fresh key for each attempt
+    clients = await start(3, keys)
+    responses = await burst(clients, [raw for raw, _ in keys], 60)
     codes = [r.status_code for r in responses]
     assert codes.count(200) == 10  # bucket capacity; refill over ~100ms is < 1 request
     assert codes.count(429) == 50
@@ -68,9 +101,9 @@ async def test_tpm_limit_holds_across_replicas(replicas: tuple[Replicas, respx.R
     start, upstream = replicas
     upstream.post(GROQ_URL).mock(return_value=httpx.Response(200, json=openai_completion()))
     # Each request is charged ~110 tokens up front (prompt estimate + max_tokens=100).
-    raw, record = key(tpm=1000)
-    clients = await start(3, [(raw, record)])
-    codes = [r.status_code for r in await fire(clients, raw, 30)]
+    keys = [key(tpm=1000) for _ in range(3)]
+    clients = await start(3, keys)
+    codes = [r.status_code for r in await burst(clients, [raw for raw, _ in keys], 30)]
     admitted = codes.count(200)
     # Charge per request: prompt estimate (8) + max_tokens (100) = 108; 1000 // 108 = 9.
     assert admitted == 9
