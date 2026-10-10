@@ -34,6 +34,10 @@ class Breaker(Protocol):
         """Returns True if the circuit is open after this failure."""
         ...
 
+    async def is_open(self, provider: str) -> bool:
+        """Read-only check (never takes the half-open probe). Used for routing decisions."""
+        ...
+
 
 @dataclass(frozen=True)
 class BreakerConfig:
@@ -57,6 +61,7 @@ class RedisCircuitBreaker:
         clock: Callable[[], float] = time.monotonic,
     ) -> None:
         self._config = config
+        self._redis = redis
         self._clock = clock
         self._closed_until: dict[str, float] = {}
         self._prefix = prefix
@@ -87,6 +92,21 @@ class RedisCircuitBreaker:
             self._probes[provider] = self._probes.get(provider, 0) + 1
             BREAKER_STATE.labels(provider).set(HALF_OPEN)
         return result != 0
+
+    async def is_open(self, provider: str) -> bool:
+        if self._closed_until.get(provider, 0.0) > self._clock():
+            return False
+        try:
+            async with self._redis.pipeline(transaction=False) as pipe:
+                pipe.time()
+                pipe.get(self._keys(provider)[1])
+                (seconds, micros), open_until = await pipe.execute()
+        except RedisError:
+            _redis_down("is_open")
+            return False
+        if open_until is None:
+            return False
+        return int(seconds) * 1000 + int(micros) // 1000 < int(open_until)
 
     def _end_probe(self, provider: str) -> bool:
         held = self._probes.get(provider, 0)
