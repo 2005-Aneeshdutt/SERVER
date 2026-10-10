@@ -21,7 +21,9 @@ dependencies = [
 
 [project.optional-dependencies]
 # Smart routing (`model: "auto"`): prompt embeddings on CPU at request time.
-router = ["sentence-transformers>=3.0"]
+# torch is listed directly: uv applies [tool.uv.sources] (the CPU wheel index) only to
+# direct dependencies, so as a transitive dep it silently resolved to the ~5 GB CUDA build.
+router = ["sentence-transformers>=3.0", "torch>=2.4"]
 
 [dependency-groups]
 # Offline routing evaluation: dataset labelling, classifier training, cost/quality curves.
