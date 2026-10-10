@@ -2,7 +2,18 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import ARRAY, Boolean, DateTime, ForeignKey, Index, Integer, Numeric, String, func
+from sqlalchemy import (
+    ARRAY,
+    Boolean,
+    DateTime,
+    Float,
+    ForeignKey,
+    Index,
+    Integer,
+    Numeric,
+    String,
+    func,
+)
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -22,6 +33,7 @@ class ApiKeyRow(Base):
     monthly_spend_cap_usd: Mapped[Decimal | None] = mapped_column(Numeric(12, 6))
     allowed_models: Mapped[list[str] | None] = mapped_column(ARRAY(String(100)))
     active: Mapped[bool] = mapped_column(Boolean, default=True)
+    routing_quality: Mapped[str] = mapped_column(String(16), default="balanced")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -49,3 +61,5 @@ class RequestRow(Base):
     error_type: Mapped[str | None] = mapped_column(String(64))
     fallback_count: Mapped[int] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    route: Mapped[str | None] = mapped_column(String(16))
+    route_probability: Mapped[float | None] = mapped_column(Float)

@@ -48,6 +48,8 @@ class RequestRecord:
     error_type: str | None
     fallback_count: int
     created_at: datetime
+    route: str | None = None  # model=auto: "cheap" | "strong"
+    route_probability: float | None = None
 
 
 class RequestLogSink(Protocol):

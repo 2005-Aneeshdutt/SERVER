@@ -28,6 +28,7 @@ def _to_record(row: ApiKeyRow) -> ApiKeyRecord:
         monthly_spend_cap_usd=row.monthly_spend_cap_usd,
         allowed_models=frozenset(row.allowed_models) if row.allowed_models is not None else None,
         active=row.active,
+        routing_quality=row.routing_quality,
     )
 
 
@@ -48,6 +49,7 @@ class SqlKeyStore:
         tpm_limit: int | None = None,
         monthly_spend_cap_usd: Decimal | None = None,
         allowed_models: list[str] | None = None,
+        routing_quality: str = "balanced",
     ) -> tuple[str, ApiKeyRecord]:
         """Returns (raw key, record). The raw key is never stored and can't be recovered."""
         raw = generate_key()
@@ -60,6 +62,7 @@ class SqlKeyStore:
             monthly_spend_cap_usd=monthly_spend_cap_usd,
             allowed_models=allowed_models,
             active=True,
+            routing_quality=routing_quality,
         )
         async with self._sessions() as session, session.begin():
             session.add(row)
