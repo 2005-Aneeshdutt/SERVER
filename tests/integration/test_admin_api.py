@@ -21,6 +21,8 @@ async def client() -> AsyncIterator[httpx.AsyncClient]:
         _env_file=None,
         models_file=str(ROOT / "models.yaml"),
         admin_token=SecretStr("test-admin-token"),
+        # Not testing routing here: skip loading the embedding model (~20 s, CPU-heavy).
+        router_model_path="does-not-exist.json",
     )
 
     async def factory() -> Container:
