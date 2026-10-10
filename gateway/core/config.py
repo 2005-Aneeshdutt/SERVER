@@ -52,6 +52,10 @@ class Settings(BaseSettings):
     # Multiplier on our tokenizer's prompt estimate (other providers' tokenizers differ).
     spend_prompt_margin: float = 1.25
 
+    # model="auto": classifier exported by eval/ (needs the "router" extra installed).
+    router_model_path: str = "gateway/routing/router_model.json"
+    router_threads: int = 2
+
     cache_ttl_s: float = 3600.0
     # Max time a request waits for an identical in-flight request before calling upstream itself.
     cache_wait_timeout_s: float = 30.0
