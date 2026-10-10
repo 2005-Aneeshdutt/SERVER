@@ -4,7 +4,7 @@ import hmac
 import uuid
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, Header, Query
 from pydantic import BaseModel, Field
@@ -33,12 +33,16 @@ async def require_admin(
 router = APIRouter(prefix="/admin", dependencies=[Depends(require_admin)])
 
 
+RoutingQuality = Literal["low", "balanced", "high"]
+
+
 class KeyCreate(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     rpm_limit: int | None = Field(default=None, ge=1)
     tpm_limit: int | None = Field(default=None, ge=1)
     monthly_spend_cap_usd: Decimal | None = Field(default=None, ge=0, decimal_places=6)
     allowed_models: list[str] | None = None
+    routing_quality: RoutingQuality = "balanced"
 
 
 class KeyUpdate(BaseModel):
@@ -50,6 +54,7 @@ class KeyUpdate(BaseModel):
     monthly_spend_cap_usd: Decimal | None = Field(default=None, ge=0, decimal_places=6)
     allowed_models: list[str] | None = None
     active: bool | None = None
+    routing_quality: RoutingQuality | None = None
 
 
 class KeyOut(BaseModel):
@@ -61,6 +66,7 @@ class KeyOut(BaseModel):
     monthly_spend_cap_usd: Decimal | None
     allowed_models: list[str] | None
     active: bool
+    routing_quality: str
     created_at: datetime | None
 
     @classmethod
@@ -74,6 +80,7 @@ class KeyOut(BaseModel):
             monthly_spend_cap_usd=row.monthly_spend_cap_usd,
             allowed_models=row.allowed_models,
             active=row.active,
+            routing_quality=row.routing_quality,
             created_at=row.created_at,
         )
 
@@ -98,7 +105,7 @@ StoreDep = Annotated[SqlKeyStore, Depends(_store)]
 
 
 def _check_aliases(container: ContainerDep, aliases: list[str] | None) -> None:
-    known = {spec.alias for spec in container.registry.all()}
+    known = {spec.alias for spec in container.registry.all()} | {"auto"}
     unknown = sorted(set(aliases or []) - known)
     if unknown:
         raise InvalidRequest(f"Unknown model aliases: {', '.join(unknown)}")
@@ -113,6 +120,7 @@ async def create_key(body: KeyCreate, container: ContainerDep, store: StoreDep) 
         tpm_limit=body.tpm_limit,
         monthly_spend_cap_usd=body.monthly_spend_cap_usd,
         allowed_models=body.allowed_models,
+        routing_quality=body.routing_quality,
     )
     row = await store.get_row(record.id)
     assert row is not None
@@ -131,8 +139,9 @@ async def update_key(
     changes = body.model_dump(include=body.model_fields_set)
     if changes.get("name") is None:
         changes.pop("name", None)
-    if changes.get("active") is None:
-        changes.pop("active", None)
+    for non_nullable in ("active", "routing_quality"):
+        if changes.get(non_nullable) is None:
+            changes.pop(non_nullable, None)
     _check_aliases(container, changes.get("allowed_models"))
     row = await store.update(key_id, changes)
     if row is None:
