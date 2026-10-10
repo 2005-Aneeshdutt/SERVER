@@ -3,8 +3,8 @@
 An OpenAI-compatible gateway that sits between apps and LLM providers. Apps point any OpenAI SDK
 at it. The gateway handles auth, provider translation, streaming, timeouts and cost/latency
 logging, plus retries, fallback chains, a shared circuit breaker, per-key rate limits and
-spend caps, and a response cache with request coalescing. Smart routing and a dashboard are
-coming (see Status).
+spend caps, a response cache with request coalescing, and `model: "auto"` routing between a
+cheap and a strong model. A dashboard is coming (see Status).
 
 ```python
 from openai import OpenAI
@@ -111,6 +111,40 @@ breaker, logging). Run on one laptop under Docker Desktop. Details and analysis:
 - **Killing a replica under load: 100% success**, after fixing two nginx/uvicorn timeout bugs the
   load test exposed (60 s connect timeout; keep-alive mismatch causing reset POSTs).
 
+## Smart routing (`model: "auto"`)
+
+```python
+client.chat.completions.create(model="auto", messages=[...])
+# -> X-Gateway-Route: cheap | strong, X-Gateway-Route-Reason, X-Gateway-Route-Probability
+```
+
+- **Hard rules decide first:** required features (tools / vision / JSON), context length,
+  provider circuit state, remaining budget.
+- **Otherwise a classifier decides:** logistic regression over int8 bge-small prompt
+  embeddings, which predicts P(the cheap model's answer is as good as the strong one). Each key
+  picks a threshold via `routing_quality`: `low` / `balanced` / `high`.
+- **The labels come from the project's own data:** 2,000 Chatbot Arena prompts, answered by
+  Llama 3.1 8B and Llama 3.3 70B, then judged pairwise by Gemini 2.5 Flash in both answer
+  orders. That cost $1.72 in total, and every generation is cached and committed.
+  `uv run --extra router --group eval python -m eval.run` reproduces every number and the chart
+  without API calls.
+
+![Cost vs quality](eval/cost_quality.svg)
+
+**Result, stated honestly:** for this model pair, the classifier (APGR 0.537) does **not**
+significantly beat a length/code/math heuristic (0.532). The 95% CI of the difference spans
+zero, and both are only slightly better than random (0.5). A train-only model-selection study
+(MLP, kNN, extra features) found nothing better either.
+
+The same-family 8B and 70B models fail on the same prompts, and 27% of judge verdicts depend on
+answer order, so the prompt carries little routing signal. This matches RouteLLM's findings for
+Arena-only training data. The analysis and what would change it:
+[`eval/RESULTS.md`](eval/RESULTS.md), [ADR 0012](docs/decisions/0012-smart-routing.md).
+
+Routing latency is 18–48 ms on this laptop's CPU, above the 10 ms target, and it's skipped
+entirely for cache hits and rule-based decisions. The ADR has the measurements and the
+trade-off.
+
 ## Load test
 
 ```bash
@@ -138,7 +172,7 @@ Tests mock all provider HTTP with `respx`. No real API calls happen in tests or 
 | **M2a:** retries, fallback chains, Redis circuit breaker, `/readyz` | done |
 | **M2b:** rate limits, spend limits (reserve then settle), cache with coalescing, admin API | done |
 | **M2c:** Postgres read replica, 3 replicas behind nginx, DB outage handling, k6 load tests | done; see `loadtest/RESULTS.md` |
-| **M3:** `model: "auto"` routing with a classifier, after RouteLLM (LMSYS, 2024) | |
+| **M3:** `model: "auto"` routing: rules, classifier, per-key quality, reproducible eval (RouteLLM metrics) | done; classifier ≈ heuristic for this model pair (see above) |
 | **M4:** dashboard and playground | |
 
 ### M1 verification
