@@ -28,6 +28,8 @@ class ApiKeyRecord:
     monthly_spend_cap_usd: Decimal | None
     allowed_models: frozenset[str] | None  # None = every alias
     active: bool
+    # model="auto": "low" saves the most, "high" sends more traffic to the strong model.
+    routing_quality: str = "balanced"
 
     def may_use(self, alias: str) -> bool:
         return self.allowed_models is None or alias in self.allowed_models
