@@ -166,6 +166,9 @@ class FakeBreaker:
         self.failures.append(provider)
         return provider in self.open
 
+    async def is_open(self, provider: str) -> bool:
+        return provider in self.open
+
 
 async def no_sleep(_: float) -> None:
     return None
@@ -206,6 +209,13 @@ class FakeSpend:
         self.reserved[request_id] = estimate_usd
         return Reservation(key.id, "2026-10", request_id, 0)
 
+    async def remaining(self, key: ApiKeyRecord) -> Decimal | None:
+        cap = key.monthly_spend_cap_usd
+        if cap is None:
+            return None
+        spent = self.spent.get(key.id, Decimal(0))
+        return cap - spent - sum(self.reserved.values(), Decimal(0))
+
     async def settle(self, reservation: Reservation, actual_usd: Decimal) -> None:
         self.reserved.pop(reservation.request_id, None)
         self.spent[reservation.key_id] = self.spent.get(reservation.key_id, Decimal(0)) + actual_usd
@@ -232,3 +242,17 @@ class MemoryCache:
     async def unlock(self, key: str, token: str) -> None:
         if self.locks.get(key) == token:
             del self.locks[key]
+
+
+class KeywordEmbedder:
+    """Deterministic 2-d 'embedding': [looks hard, looks easy]. No ML model needed."""
+
+    dim = 2
+    HARD = ("prove", "algorithm", "theorem", "optimize")
+
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def embed(self, texts: Sequence[str]) -> list[list[float]]:
+        self.calls += 1
+        return [[1.0, 0.0] if any(w in t.lower() for w in self.HARD) else [0.0, 1.0] for t in texts]
