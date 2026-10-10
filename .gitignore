@@ -8,3 +8,6 @@ __pycache__/
 dist/
 node_modules/
 eval/.cache/
+
+# Recomputable embedding cache (python -m eval.run rebuilds it)
+eval/data/embeddings.jsonl
