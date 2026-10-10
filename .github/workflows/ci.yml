@@ -1,0 +1,51 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+      - run: uv sync --frozen
+      - name: ruff
+        run: uv run ruff check . && uv run ruff format --check .
+      - name: mypy
+        run: uv run mypy
+      - name: unit tests
+        run: uv run pytest
+
+  integration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: gateway
+          POSTGRES_PASSWORD: gateway
+          POSTGRES_DB: gateway
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U gateway" --health-interval 2s --health-retries 30
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 2s --health-retries 30
+    env:
+      DATABASE_URL: postgresql+asyncpg://gateway:gateway@localhost:5432/gateway
+      REDIS_URL: redis://localhost:6379/0
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+      - run: uv sync --frozen
+      - run: uv run alembic upgrade head
+      - run: uv run pytest -m integration
