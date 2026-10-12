@@ -69,3 +69,7 @@ ROUTER_LATENCY = Histogram(
     "Time to make a model=auto routing decision (incl. prompt embedding)",
     buckets=(0.002, 0.005, 0.01, 0.02, 0.03, 0.05, 0.075, 0.1, 0.2, 0.5),
 )
+IN_FLIGHT = Gauge("gateway_in_flight_requests", "Requests this replica is currently serving")
+REQUESTS_SHED = Counter(
+    "gateway_requests_shed_total", "Requests rejected with 503 because the replica was at capacity"
+)

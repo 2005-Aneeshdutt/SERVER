@@ -118,6 +118,17 @@ class LimiterUnavailable(GatewayError):
     code = "limiter_unavailable"
 
 
+class Overloaded(GatewayError):
+    """This replica is at its in-flight cap: shed now rather than queue for seconds."""
+
+    status_code = 503
+    error_type = "api_error"
+    code = "overloaded"
+
+    def headers(self) -> dict[str, str]:
+        return {"Retry-After": "1"}
+
+
 class ProviderError(GatewayError):
     """Base for normalized upstream failures."""
 
