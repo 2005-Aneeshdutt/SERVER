@@ -8,7 +8,7 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-from gateway.api import admin, chat, health, models
+from gateway.api import admin, chat, demo, health, models
 from gateway.container import Container, build_container
 from gateway.core.config import get_settings
 from gateway.core.errors import GatewayError
@@ -44,6 +44,7 @@ def create_app(container_factory: ContainerFactory | None = None) -> FastAPI:
     app.include_router(models.router)
     app.include_router(health.router)
     app.include_router(admin.router)
+    app.include_router(demo.router)
     _install_error_handlers(app)
     return app
 
