@@ -9,6 +9,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from gateway.api import admin, chat, demo, health, models
+from gateway.api.load_shed import LoadShedder
 from gateway.container import Container, build_container
 from gateway.core.config import get_settings
 from gateway.core.errors import GatewayError
@@ -22,8 +23,14 @@ async def _default_container() -> Container:
     return await build_container(get_settings())
 
 
-def create_app(container_factory: ContainerFactory | None = None) -> FastAPI:
+def create_app(
+    container_factory: ContainerFactory | None = None, max_in_flight: int | None = None
+) -> FastAPI:
+    """`max_in_flight` caps concurrent requests per replica (0 = no cap). Defaults to the
+    setting when running for real; tests that inject a container opt in explicitly."""
     factory = container_factory or _default_container
+    if max_in_flight is None:
+        max_in_flight = get_settings().max_in_flight if container_factory is None else 0
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -46,6 +53,7 @@ def create_app(container_factory: ContainerFactory | None = None) -> FastAPI:
     app.include_router(admin.router)
     app.include_router(demo.router)
     _install_error_handlers(app)
+    app.add_middleware(LoadShedder, limit=max_in_flight)
     return app
 
 

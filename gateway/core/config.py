@@ -48,6 +48,10 @@ class Settings(BaseSettings):
 
     redis_timeout_s: float = 0.5
 
+    # Load shedding: max concurrent requests per replica before answering 503 (0 = off).
+    # Size it as throughput x latency (Little's law) for the upstream you expect; ADR 0014.
+    max_in_flight: int = 512
+
     # Spend limits: reservations of crashed requests are released after this long.
     spend_reservation_ttl_s: float = 300.0
     # Multiplier on our tokenizer's prompt estimate (other providers' tokenizers differ).
