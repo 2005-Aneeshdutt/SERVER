@@ -5,10 +5,12 @@
 // waiting on the upstream), so it doesn't depend on the mock's latency.
 import http from "k6/http";
 import { check } from "k6";
-import { Trend } from "k6/metrics";
+import { Counter, Trend } from "k6/metrics";
 
 const gatewayOverhead = new Trend("gateway_overhead_ms", true);
 const upstreamTime = new Trend("upstream_ms", true);
+// 503s from load shedding: the replica refused the request instead of queueing it.
+const shed = new Counter("shed");
 
 const RATE = parseInt(__ENV.RATE || "100");
 const URL = __ENV.URL || "http://nginx:8000";
@@ -27,6 +29,9 @@ export const options = {
     },
   },
   summaryTrendStats: ["avg", "min", "med", "p(90)", "p(95)", "p(99)", "max"],
+  // A (always-passing) threshold makes k6 export the sub-metric: latency of successful requests
+  // only, so fast 503s from shedding don't flatter the latency numbers.
+  thresholds: { "http_req_duration{expected_response:true}": ["max>=0"] },
 };
 
 const params = {
@@ -46,6 +51,7 @@ export default function () {
   });
   const res = http.post(`${URL}/v1/chat/completions`, body, params);
   check(res, { "status 200": (r) => r.status === 200 });
+  if (res.status === 503) shed.add(1);
   const timing = res.headers["Server-Timing"];
   if (timing) {
     const gw = /gateway;dur=([\d.]+)/.exec(timing);
