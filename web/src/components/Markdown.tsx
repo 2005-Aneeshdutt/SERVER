@@ -37,8 +37,25 @@ function Blocks({ text }: { text: string }) {
     out.push(list.ordered ? <ol key={`l${out.length}`}>{items}</ol> : <ul key={`l${out.length}`}>{items}</ul>);
     list = null;
   };
-  for (const raw of text.split("\n")) {
-    const line = raw.trimEnd();
+  const lines = text.split("\n");
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]!.trimEnd();
+    const next = lines[i + 1]?.trim() ?? "";
+    // Setext heading: a text line underlined with === or ---
+    if (line.trim() && /^(=+|-+)$/.test(next) && next.length >= 3) {
+      flushPara();
+      flushList();
+      const Tag = next.startsWith("=") ? "h3" : "h4";
+      out.push(<Tag key={`h${out.length}`}>{inline(line.trim())}</Tag>);
+      i++;
+      continue;
+    }
+    if (/^(\*{3,}|-{3,}|_{3,})$/.test(line.trim())) {
+      flushPara();
+      flushList();
+      out.push(<hr key={`r${out.length}`} />);
+      continue;
+    }
     const heading = /^(#{1,6})\s+(.*)$/.exec(line);
     const bullet = /^\s*[-*]\s+(.*)$/.exec(line);
     const numbered = /^\s*\d+[.)]\s+(.*)$/.exec(line);
