@@ -57,6 +57,9 @@ class DispatchTrace:
     # Time spent waiting on providers (streams: until the first content chunk), so
     # total - upstream_s = what the gateway itself added.
     upstream_s: float = 0.0
+    # Providers to treat as down for THIS request only (X-Gateway-Simulate-Outage). Lets the
+    # public playground demonstrate failover without touching shared circuit-breaker state.
+    simulated_down: frozenset[str] = frozenset()
 
 
 @dataclass
@@ -128,6 +131,10 @@ class Dispatcher:
         last_error: ProviderError | None = None
         for index, spec in enumerate(candidates):
             provider = self.providers[spec.provider]
+            if provider.name in trace.simulated_down:
+                UPSTREAM_ATTEMPTS.labels(provider.name, "simulated_outage").inc()
+                trace.skipped.append(spec.alias)
+                continue
             if not await self._breaker.allow(provider.name):
                 UPSTREAM_ATTEMPTS.labels(provider.name, "circuit_open").inc()
                 trace.skipped.append(spec.alias)
