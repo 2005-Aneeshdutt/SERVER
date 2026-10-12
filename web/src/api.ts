@@ -57,14 +57,21 @@ export interface DemoKey {
 
 export const createDemoKey = () => request<DemoKey>("/demo/keys", { method: "POST" });
 
+export interface Message {
+  role: "system" | "user" | "assistant";
+  content: string;
+}
+
 export interface ChatOptions {
   key: string;
   model: string;
-  prompt: string;
+  messages: Message[];
   stream: boolean;
   deterministic: boolean;
   maxTokens: number;
   simulateOutage: string[];
+  /** OpenAI's reasoning_effort for reasoning models (gpt-oss); others ignore it. */
+  reasoningEffort?: "low" | "medium" | "high";
 }
 
 /** Everything the gateway tells us about one call, from headers and the stream itself. */
@@ -73,6 +80,8 @@ export interface ChatResult {
   status: number;
   text: string;
   reasoning: string;
+  /** "length" means the answer was cut off by max_tokens. */
+  finishReason?: string;
   error?: string;
   totalMs: number;
   ttftMs?: number;
@@ -100,7 +109,11 @@ interface Delta {
 }
 
 interface StreamEvent {
-  choices?: { delta?: Delta; message?: Delta & { content?: string | null } }[];
+  choices?: {
+    delta?: Delta;
+    message?: Delta & { content?: string | null };
+    finish_reason?: string | null;
+  }[];
   usage?: { prompt_tokens: number; completion_tokens: number };
   x_gateway?: { cost_usd: string };
   error?: { message?: string };
@@ -143,11 +156,12 @@ export async function chat(
   if (opts.simulateOutage.length) headers["X-Gateway-Simulate-Outage"] = opts.simulateOutage.join(",");
   const body = {
     model: opts.model,
-    messages: [{ role: "user", content: opts.prompt }],
+    messages: opts.messages,
     max_tokens: opts.maxTokens,
     stream: opts.stream,
     ...(opts.stream ? { stream_options: { include_usage: true } } : {}),
     ...(opts.deterministic ? { temperature: 0 } : { temperature: 0.7 }),
+    ...(opts.reasoningEffort ? { reasoning_effort: opts.reasoningEffort } : {}),
   };
   const res = await fetch("/v1/chat/completions", {
     method: "POST",
@@ -172,6 +186,7 @@ export async function chat(
   } else {
     const data = (await res.json()) as StreamEvent;
     const message = data.choices?.[0]?.message;
+    result.finishReason = data.choices?.[0]?.finish_reason ?? undefined;
     result.text = message?.content ?? "";
     result.reasoning = message?.reasoning ?? message?.reasoning_content ?? "";
     result.promptTokens = data.usage?.prompt_tokens;
@@ -206,6 +221,8 @@ async function readStream(
         result.error = parsed.error.message ?? "stream failed";
         continue;
       }
+      const finish = parsed.choices?.[0]?.finish_reason;
+      if (finish) result.finishReason = finish;
       const delta = parsed.choices?.[0]?.delta;
       const piece = delta?.content ?? "";
       const thought = delta?.reasoning ?? delta?.reasoning_content ?? "";
