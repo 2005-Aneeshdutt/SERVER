@@ -118,6 +118,56 @@ def _extras(data: dict[str, Any]) -> list[str]:
     return lines
 
 
+def _overload(data: dict[str, Any]) -> list[str]:
+    if "overload" not in data:
+        return []
+    o = data["overload"]
+    lines = [
+        "",
+        f"## Past saturation: load shedding off vs on ({o['replicas']} replica)",
+        "",
+        f"Same arrival rates, one replica (saturates at ~80 RPS). **On** = at most {o['cap']} "
+        "requests in flight per replica; the rest get an immediate `503` + `Retry-After: 1`. "
+        "Goodput = successful responses per second. Latency is for successful requests only, so "
+        "fast 503s don't flatter it. Dropped = arrivals k6 couldn't even send (all its virtual "
+        "users were stuck waiting).",
+        "",
+        "| Offered RPS | Shedding | Goodput | Shed | OK latency p50 / p99 (ms) | Dropped |",
+        "|---|---|---|---|---|---|",
+    ]
+    off, on = o["runs"]["off"], o["runs"]["on"]
+    for a, b in zip(off, on, strict=True):
+        for label, s in (("off", a), ("on", b)):
+            ok = s["ok_latency_ms"]
+            lines.append(
+                f"| {s['target_rps']} | {label} | {s['goodput_rps']} | "
+                f"{s['shed_rate'] * 100:.1f}% | {_ms(ok, 'med')} / {_ms(ok, 'p(99)')} | "
+                f"{s['dropped_iterations']} |"
+            )
+    study = o.get("cap_study", [])
+    if study:
+        lines += [
+            "",
+            "### Choosing the cap",
+            "",
+            "Shedding on, one replica. Goodput (OK latency p99) at each offered rate:",
+            "",
+            "| Cap | "
+            + " | ".join(f"{r} RPS" for r in sorted({s["target_rps"] for s in study}))
+            + " |",
+            "|---|" + "---|" * len({s["target_rps"] for s in study}),
+        ]
+        for cap in sorted({s["cap"] for s in study}):
+            cells = [
+                f"{s['goodput_rps']} ({_ms(s['ok_latency_ms'], 'p(99)')} ms)"
+                for s in sorted(study, key=lambda s: s["target_rps"])
+                if s["cap"] == cap
+            ]
+            mark = " (chosen)" if cap == o["cap"] else ""
+            lines.append(f"| {cap}{mark} | " + " | ".join(cells) + " |")
+    return lines
+
+
 def render(data: dict[str, Any]) -> str:
     sweeps = data["sweeps"]
     lines = [
@@ -146,6 +196,7 @@ def render(data: dict[str, Any]) -> str:
             f"- **{sweep['replicas']} replica(s)** @ {last['target_rps']} RPS: {_cpu(last)}"
         )
     lines += _extras(data)
+    lines += _overload(data)
     if ANALYSIS.exists():
         lines += ["", ANALYSIS.read_text(encoding="utf-8").strip()]
     return "\n".join(lines) + "\n"

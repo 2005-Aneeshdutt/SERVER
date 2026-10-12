@@ -12,12 +12,14 @@ services:
       OPENROUTER_API_KEY: ""
       ANTHROPIC_API_KEY: ""
       OLLAMA_BASE_URL: ""
+      # Per-replica in-flight cap (0 = no shedding); run.py's overload test sets it.
+      MAX_IN_FLIGHT: ${MAX_IN_FLIGHT:-512}
     depends_on:
       mock-llm:
         condition: service_started
 
   mock-llm:
-    build: .
+    image: llm-gateway:local  # same image as the gateway; only the command differs
     command: ["uvicorn", "mock_llm:app", "--app-dir", "/loadtest", "--host", "0.0.0.0", "--port", "9000", "--workers", "4", "--no-access-log"]
     volumes:
       - ./loadtest:/loadtest:ro

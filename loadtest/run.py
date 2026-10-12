@@ -3,6 +3,7 @@
     uv run python loadtest/run.py                 # full sweep: 1, 2, 3 replicas + failover test
     uv run python loadtest/run.py --replicas 1 --rates 100,200 --duration 10s   # quick check
     uv run python loadtest/run.py --report-only   # rebuild RESULTS.md from results/*.json
+    uv run python loadtest/run.py --overload-only # 1 replica past saturation, shedding off vs on
 
 For each replica count: scale `api`, restart nginx (it resolves replicas at startup), create a
 high-limit key via the admin API, then step the arrival rate until the gateway can't keep up.
@@ -36,6 +37,12 @@ DEFAULT_RATES = "50,60,70,80,90,100,115,130,145,160,175,190,205,220"
 # A step counts as "sustained" if the gateway kept up with the offered load, almost everything
 # succeeded, and tail latency stayed sane (the mock adds a fixed 100ms).
 MIN_ACHIEVED, MIN_SUCCESS, MAX_P99_MS = 0.95, 0.99, 1000.0
+# Overload test: one replica (saturates at ~80 RPS) driven well past saturation.
+OVERLOAD_RATES = (60, 80, 100, 130, 160, 200)
+# In-flight cap per replica when shedding is on, picked by cap_study(): ~1.5x the in-flight count
+# at saturation (Little's law: 80 RPS x 0.125 s = 10). See docs/decisions/0014.
+OVERLOAD_CAP = 16
+CAP_STUDY = ((8, 16, 32, 64), (80, 130, 200))
 
 
 def sh(args: list[str], capture: bool = False) -> str:
@@ -50,8 +57,13 @@ def admin_token() -> str:
     raise SystemExit("ADMIN_TOKEN must be set in .env")
 
 
-def scale(replicas: int) -> None:
+def scale(replicas: int, max_in_flight: int | None = None) -> None:
     print(f"\n=== scaling to {replicas} replica(s) ===", flush=True)
+    # Compose interpolates MAX_IN_FLIGHT into the overlay; a changed value recreates the replicas.
+    if max_in_flight is None:
+        os.environ.pop("MAX_IN_FLIGHT", None)
+    else:
+        os.environ["MAX_IN_FLIGHT"] = str(max_in_flight)
     sh([*COMPOSE, "up", "-d", "--scale", f"api={replicas}", "mock-llm", "api", "nginx"])
     deadline = time.time() + 180
     while time.time() < deadline:
@@ -134,12 +146,16 @@ def summarize(summary: dict[str, Any], rate: int, cpu: dict[str, float]) -> dict
     achieved = float(m["http_reqs"]["values"]["rate"])
     success = float(m.get("checks", {}).get("values", {}).get("rate", 0))
     latency = trend("http_req_duration")
+    total = float(m["http_reqs"]["values"]["count"]) or 1.0
     return {
         "target_rps": rate,
         "achieved_rps": round(achieved, 1),
         "success_rate": round(success, 4),
         "latency_ms": latency,
         "gateway_overhead_ms": trend("gateway_overhead_ms"),
+        "ok_latency_ms": trend("http_req_duration{expected_response:true}"),
+        "goodput_rps": round(achieved * success, 1),
+        "shed_rate": round(float(m.get("shed", {}).get("values", {}).get("count", 0)) / total, 4),
         "dropped_iterations": int(
             m.get("dropped_iterations", {}).get("values", {}).get("count", 0)
         ),
@@ -206,6 +222,46 @@ def streaming_test(rate: int = 40) -> dict[str, Any]:
     return result
 
 
+def overload_test() -> dict[str, Any]:
+    """One replica, past saturation, with load shedding off and then on (same rates)."""
+    runs: dict[str, list[dict[str, Any]]] = {}
+    for label, cap in (("off", 0), ("on", OVERLOAD_CAP)):
+        scale(1, max_in_flight=cap)
+        key = create_key()
+        run_k6(50, "5s", key, f"warmup-shed-{label}")
+        runs[label] = []
+        for rate in OVERLOAD_RATES:
+            step = run_k6(rate, "20s", key, f"shed-{label}-{rate}")
+            runs[label].append(step)
+            print(
+                f"  shedding {label:>3} @ {rate:>4} rps -> goodput {step['goodput_rps']:>6} "
+                f"shed {step['shed_rate'] * 100:5.1f}% "
+                f"ok-p99 {step['ok_latency_ms']['p(99)']:>8}ms "
+                f"dropped {step['dropped_iterations']}",
+                flush=True,
+            )
+    return {"replicas": 1, "cap": OVERLOAD_CAP, "runs": runs, "cap_study": cap_study()}
+
+
+def cap_study() -> list[dict[str, Any]]:
+    """Too low a cap leaves the replica idle; too high lets the queue (and latency) grow back."""
+    caps, rates = CAP_STUDY
+    rows = []
+    for cap in caps:
+        scale(1, max_in_flight=cap)
+        key = create_key()
+        run_k6(50, "5s", key, f"warmup-cap{cap}")
+        for rate in rates:
+            step = run_k6(rate, "20s", key, f"cap{cap}-{rate}")
+            rows.append({"cap": cap, **step})
+            print(
+                f"  cap {cap:>3} @ {rate:>4} rps -> goodput {step['goodput_rps']:>6} "
+                f"ok-p99 {step['ok_latency_ms']['p(99)']:>8}ms",
+                flush=True,
+            )
+    return rows
+
+
 def write_report(data: dict[str, Any]) -> None:
     from loadtest.report import render  # local import: report is plain formatting
 
@@ -219,6 +275,10 @@ def main() -> None:
     parser.add_argument("--rates", default=DEFAULT_RATES)
     parser.add_argument("--duration", default="20s")
     parser.add_argument("--skip-extras", action="store_true", help="no failover/streaming tests")
+    parser.add_argument("--no-build", action="store_true", help="use already-built images")
+    parser.add_argument(
+        "--overload-only", action="store_true", help="rerun the load-shedding test only"
+    )
     parser.add_argument("--report-only", action="store_true")
     parser.add_argument(
         "--extras-only", action="store_true", help="rerun streaming + failover, keep the sweeps"
@@ -229,7 +289,13 @@ def main() -> None:
         write_report(json.loads(results_file.read_text(encoding="utf-8")))
         return
     RESULTS.mkdir(exist_ok=True)
-    sh([*COMPOSE, "build", "api", "mock-llm"])
+    if not args.no_build:  # OneDrive checkouts: scripts/build-images.sh, then --no-build
+        sh([*COMPOSE, "build", "api"])
+    if args.overload_only:
+        data = json.loads(results_file.read_text(encoding="utf-8"))
+        data["overload"] = overload_test()
+        _restore_and_save(data, results_file)
+        return
     if args.extras_only:
         data = json.loads(results_file.read_text(encoding="utf-8"))
         data["streaming"], data["failover"] = streaming_test(), failover_test()
@@ -250,10 +316,12 @@ def main() -> None:
     if not args.skip_extras:
         data["streaming"] = streaming_test()
         data["failover"] = failover_test()
+        data["overload"] = overload_test()
     _restore_and_save(data, results_file)
 
 
 def _restore_and_save(data: dict[str, Any], results_file: Path) -> None:
+    os.environ.pop("MAX_IN_FLIGHT", None)
     sh([*COMPOSE, "up", "-d", "--scale", "api=1", "api", "nginx"])
     sh([*COMPOSE, "restart", "nginx"])
     results_file.write_text(json.dumps(data, indent=2), encoding="utf-8")
