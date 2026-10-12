@@ -4,7 +4,7 @@ An OpenAI-compatible gateway that sits between apps and LLM providers. Apps poin
 at it. The gateway handles auth, provider translation, streaming, timeouts and cost/latency
 logging, plus retries, fallback chains, a shared circuit breaker, per-key rate limits and
 spend caps, a response cache with request coalescing, and `model: "auto"` routing between a
-cheap and a strong model. A dashboard is coming (see Status).
+cheap and a strong model. It ships with a web **playground** and an operator **dashboard**.
 
 ```python
 from openai import OpenAI
@@ -70,20 +70,50 @@ available or limiter down.
 
 Design decisions: [`docs/decisions/`](docs/decisions/)
 
+## Playground and dashboard
+
+Open **http://localhost:8000** once the stack is up.
+
+![Playground](docs/images/playground.png)
+
+The **Playground**:
+- **Get demo key** issues a throwaway key ($0.02 cap, 10 requests/min).
+- Pick `auto` or any alias and send a prompt. The panel shows the route and why, which provider
+  served it, the fallback path, cache status, cost, latency, time to first token and the
+  gateway's own overhead.
+- **Simulate an outage** skips a provider *for that request only*, so you can watch failover
+  without affecting anyone else.
+
+![Dashboard](docs/images/dashboard.png)
+
+The **Dashboard** (needs `ADMIN_TOKEN`):
+- requests, spend, cache hit rate, failovers and latency, read from the Postgres replica
+- provider health with a **Take down** switch that forces a real failover for all traffic
+- usage by key and model, a live request feed, and key management
+
+The UI is React + TypeScript + Vite with no other runtime dependencies: charts are hand-written
+SVG. nginx serves it from the same origin as the API. Design notes:
+[ADR 0013](docs/decisions/0013-public-demo-and-kill-switch.md).
+
 ## Run it
 
 ```bash
-cp .env.example .env            # add GEMINI_API_KEY / OPENROUTER_API_KEY / GROQ_API_KEY
-docker compose up -d --build    # nginx + api + postgres (+ replica) + redis; migrations run once
+cp .env.example .env            # add GEMINI_API_KEY / OPENROUTER_API_KEY / GROQ_API_KEY, ADMIN_TOKEN
+docker compose up -d --build    # nginx + UI + api + postgres (+ replica) + redis; migrations run once
+# Repo inside OneDrive? Docker Desktop can't read its placeholder files; build with:
+#   bash scripts/build-images.sh && docker compose up -d --no-build
 docker compose up -d --scale api=3 && docker compose restart nginx   # 3 gateway replicas
 # set ADMIN_TOKEN in .env, then create a key (the raw key is shown once):
 curl localhost:8000/admin/keys -H "Authorization: Bearer $ADMIN_TOKEN" -H 'content-type: application/json'   -d '{"name":"me","rpm_limit":60,"tpm_limit":100000,"monthly_spend_cap_usd":"5"}'
-GATEWAY_KEY=gw-... uv run python scripts/smoke_openai_sdk.py --aliases gemini-flash,or-llama-8b
+GATEWAY_KEY=gw-... uv run python scripts/smoke_openai_sdk.py --aliases groq-gpt-oss-20b,gemini-flash
 ```
 
 Admin API (Bearer `ADMIN_TOKEN`; disabled while it's the placeholder):
 - `POST /admin/keys`, `GET /admin/keys`, `PATCH /admin/keys/{id}` (e.g. `{"active": false}`).
 - `GET /admin/usage`: cost, tokens, p50/p95 latency, cache hits, errors per key and alias.
+- `GET /admin/usage/timeseries`, `GET /admin/requests`: dashboard feeds.
+- `GET /admin/providers`, `POST /admin/providers/{name}/outage` (`{"down": true}`): kill switch.
+- `POST /demo/keys`: throwaway playground keys (when `DEMO_ENABLED=true`).
 
 - `GET /healthz`: liveness.
 - `GET /readyz`: readiness plus a dependency report.
@@ -173,7 +203,7 @@ Tests mock all provider HTTP with `respx`. No real API calls happen in tests or 
 | **M2b:** rate limits, spend limits (reserve then settle), cache with coalescing, admin API | done |
 | **M2c:** Postgres read replica, 3 replicas behind nginx, DB outage handling, k6 load tests | done; see `loadtest/RESULTS.md` |
 | **M3:** `model: "auto"` routing: rules, classifier, per-key quality, reproducible eval (RouteLLM metrics) | done; classifier ≈ heuristic for this model pair (see above) |
-| **M4:** dashboard and playground | |
+| **M4:** playground, dashboard, kill switch, demo keys | done; see screenshots above |
 
 ### M1 verification
 - The official OpenAI SDK runs against the gateway (streaming and non-streaming) in tests with
@@ -212,3 +242,13 @@ Tests mock all provider HTTP with `respx`. No real API calls happen in tests or 
 - Primary down: known keys keep working (stale-if-error), unknown keys get 503, and request logs
   buffer and then flush, with all rows recovered (tested live).
 - k6 sweep for 1/2/3 replicas, a streaming run and a replica-kill run; see the benchmarks above.
+
+### M4 verification
+- 151 unit and 31 integration tests, plus a strict TypeScript check and production build in CI.
+- Live, through nginx on the real stack:
+  - a demo key was issued and used;
+  - `model: "auto"` routed a coding prompt to Llama 70B and a factual one to Llama 8B;
+  - a simulated Groq outage failed over to OpenRouter for that request only;
+  - **Take down** on Groq failed over all traffic, and **Restore** brought it back;
+  - the dashboard read from the replica.
+- The UI was driven in headless Chrome to produce the screenshots above, in light and dark themes.
