@@ -63,7 +63,10 @@ class Settings(BaseSettings):
     demo_rpm: int = 10
     demo_tpm: int = 20_000
     demo_keys_per_hour: int = 30
-    demo_models: str = "auto,groq-gpt-oss-20b,groq-gpt-oss-120b,gemini-flash-lite,or-llama-8b"
+    # Must include both models behind "auto", or demo keys could never be routed "strong".
+    demo_models: str = (
+        "auto,or-llama-8b,or-llama-70b,groq-gpt-oss-20b,groq-gpt-oss-120b,gemini-flash-lite"
+    )
 
     cache_ttl_s: float = 3600.0
     # Max time a request waits for an identical in-flight request before calling upstream itself.
