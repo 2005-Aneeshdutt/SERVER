@@ -99,7 +99,15 @@ async def test_rpm_limit_holds_across_three_replicas(
 
 async def test_tpm_limit_holds_across_replicas(replicas: tuple[Replicas, respx.Router]) -> None:
     start, upstream = replicas
-    upstream.post(GROQ_URL).mock(return_value=httpx.Response(200, json=openai_completion()))
+
+    async def slow_completion(request: httpx.Request) -> httpx.Response:
+        # Finished requests refund their unused TPM estimate (108 charged, 13 used). If they
+        # finished mid-burst, later requests could legitimately use that room; holding them
+        # in flight makes every admission decision see the same, un-refunded bucket.
+        await asyncio.sleep(0.3)
+        return httpx.Response(200, json=openai_completion())
+
+    upstream.post(GROQ_URL).mock(side_effect=slow_completion)
     # Each request is charged ~110 tokens up front (prompt estimate + max_tokens=100).
     keys = [key(tpm=1000) for _ in range(3)]
     clients = await start(3, keys)
