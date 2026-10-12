@@ -1,17 +1,20 @@
 import asyncio
 import uuid
 from collections.abc import AsyncIterator
-from datetime import datetime
+from datetime import UTC, datetime
 from decimal import Decimal
+from typing import Any
 
 import pytest
 from redis.asyncio import Redis
+from redis.exceptions import ConnectionError as RedisConnectionError
 
 from gateway.core.auth import ApiKeyRecord
 from gateway.core.config import Settings
 from gateway.core.errors import SpendCapExceeded
 from gateway.limits.ratelimit import RedisRateLimiter
 from gateway.limits.spend import RedisSpendLimiter, from_nanos
+from gateway.observability.metrics import SPEND_SETTLE_FAILURES
 
 pytestmark = pytest.mark.integration
 
@@ -107,6 +110,66 @@ async def test_settle_adds_actual_and_releases_reservation(redis: Redis) -> None
     assert await limiter.reserve(key, "r2", Decimal("0.85")) is not None  # 0.10 + 0.85 <= 1
     spent = await redis.get(limiter._keys(key.id, res.month)[0])
     assert spent is not None and from_nanos(int(spent)) == Decimal("0.10")
+
+
+async def spent_usd(redis: Redis, limiter: RedisSpendLimiter, key: ApiKeyRecord) -> Decimal:
+    month = datetime.now(UTC).strftime("%Y-%m")
+    raw = await redis.get(limiter._keys(key.id, month)[0])
+    assert raw is not None
+    return from_nanos(int(raw))
+
+
+async def test_settling_twice_counts_the_cost_once(redis: Redis) -> None:
+    limiter, key = RedisSpendLimiter(redis, Ledger(Decimal(0)), 60), record(cap=Decimal(1))
+    res = await limiter.reserve(key, "r1", Decimal("0.50"))
+    assert res is not None
+    await limiter.settle(res, Decimal("0.10"))
+    await limiter.settle(res, Decimal("0.10"))  # e.g. a retry after an ambiguous timeout
+    assert await spent_usd(redis, limiter, key) == Decimal("0.10")
+
+
+class FlakySettle:
+    """Wraps the settle script: the first `failures` calls raise like a Redis blip would."""
+
+    def __init__(self, script: Any, failures: int) -> None:
+        self.script, self.failures, self.calls = script, failures, 0
+
+    async def __call__(self, **kwargs: Any) -> Any:
+        self.calls += 1
+        if self.calls <= self.failures:
+            raise RedisConnectionError("blip")
+        return await self.script(**kwargs)
+
+
+async def test_settle_is_retried_in_background_after_a_redis_error(redis: Redis) -> None:
+    limiter = RedisSpendLimiter(redis, Ledger(Decimal(0)), 60, retry_delays_s=(0.01,) * 3)
+    key = record(cap=Decimal(1))
+    res = await limiter.reserve(key, "r1", Decimal("0.50"))
+    assert res is not None
+    flaky = FlakySettle(limiter._settle, failures=2)
+    limiter._settle = flaky  # type: ignore[assignment]
+
+    await limiter.settle(res, Decimal("0.20"))  # returns at once; retries run in background
+    await limiter.close()
+
+    assert flaky.calls == 3
+    assert await spent_usd(redis, limiter, key) == Decimal("0.20")
+    # The 0.50 reservation was released: 0.20 settled + 0.80 fits a $1 cap exactly.
+    assert await limiter.reserve(key, "r2", Decimal("0.80")) is not None
+
+
+async def test_exhausted_settle_retries_are_counted(redis: Redis) -> None:
+    limiter = RedisSpendLimiter(redis, Ledger(Decimal(0)), 60, retry_delays_s=(0.01, 0.01))
+    key = record(cap=Decimal(1))
+    res = await limiter.reserve(key, "r1", Decimal("0.50"))
+    assert res is not None
+    limiter._settle = FlakySettle(limiter._settle, failures=99)  # type: ignore[assignment]
+    before = SPEND_SETTLE_FAILURES._value.get()
+
+    await limiter.settle(res, Decimal("0.20"))
+    await limiter.close()
+
+    assert SPEND_SETTLE_FAILURES._value.get() - before == 1
 
 
 async def test_crashed_requests_reservation_expires(redis: Redis) -> None:
