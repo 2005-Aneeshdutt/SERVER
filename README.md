@@ -55,6 +55,8 @@ flowchart LR
 - **Cache:** exact match for `temperature: 0` (or `X-Gateway-Cache: force`). 100 identical
   concurrent requests make **one** upstream call (the others wait for it). Hits cost $0 and can
   be replayed as a stream. Fails open.
+- **Load shedding:** each replica caps its in-flight requests and answers the excess with an
+  immediate 503 + `Retry-After`, instead of queueing them for seconds. Health checks are exempt.
 - **Usage:** if a provider doesn't report token usage, the gateway counts tokens with tiktoken and
   flags the row `usage_estimated`.
 - **Money is `Decimal` everywhere**, with prices per 1M tokens in `models.yaml`.
@@ -66,7 +68,7 @@ served the request), `X-Gateway-Fallbacks`, `X-Gateway-Attempts`, `X-Gateway-Cos
 
 Errors: 401 bad key · 402 spend cap · 403 model not allowed · 404 unknown model ·
 429 rate limit · 502/504 upstream failure after retries and fallbacks · 503 no provider
-available or limiter down.
+available, limiter down, or replica overloaded (with `Retry-After`).
 
 Design decisions: [`docs/decisions/`](docs/decisions/)
 
@@ -140,6 +142,10 @@ breaker, logging). Run on one laptop under Docker Desktop. Details and analysis:
   the Python async stack. Cutting Redis round trips from 6 to 4 reduced CPU per request by ~22%.
 - **Killing a replica under load: 100% success**, after fixing two nginx/uvicorn timeout bugs the
   load test exposed (60 s connect timeout; keep-alive mismatch causing reset POSTs).
+- **Past saturation, with load shedding** (1 replica at 1.25–2.5× capacity): p99 of successful
+  requests went from **19–28 s to 0.29–0.62 s**, and goodput went *up* from ~49 to **76–90 RPS**. The
+  cap (16) comes from Little's law and a cap study; see
+  [ADR 0014](docs/decisions/0014-load-shedding.md).
 
 ## Smart routing (`model: "auto"`)
 
