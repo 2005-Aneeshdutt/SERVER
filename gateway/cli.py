@@ -1,6 +1,6 @@
 """Admin CLI (until the /admin API lands in M2).
 
-python -m gateway.cli create-key --name demo --models groq-llama-8b,gemini-flash
+python -m gateway.cli create-key --name demo --models groq-gpt-oss-20b,gemini-flash
 python -m gateway.cli list-keys
 """
 

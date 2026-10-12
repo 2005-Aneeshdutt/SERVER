@@ -29,7 +29,7 @@ $0.0001525 each → exactly 6 admitted (⌊0.001 / 0.0001525⌋), 34 × 402. Als
 - **Prompt:** our tiktoken count × **1.25**, because other providers' tokenizers count
   differently.
 - **Model:** a fallback may serve the request, so we reserve at the **most expensive candidate**
-  in the fallback chain. That's why a `groq-llama-8b` request ($0.08/M output) reserves at
+  in the fallback chain. That's why an `or-llama-8b` request ($0.08/M output) reserves at
   `gemini-flash-lite`'s $1.50/M rate. Verified live: the 402 message reported a $0.001538
   worst case for exactly this reason.
 
