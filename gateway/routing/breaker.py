@@ -38,6 +38,14 @@ class Breaker(Protocol):
         """Read-only check (never takes the half-open probe). Used for routing decisions."""
         ...
 
+    async def state(self, provider: str) -> str:
+        """closed | open | half_open | forced_down (for the dashboard)."""
+        ...
+
+    async def set_forced_down(self, provider: str, down: bool) -> None:
+        """Operator kill switch: reject all traffic to the provider until cleared."""
+        ...
+
 
 @dataclass(frozen=True)
 class BreakerConfig:
@@ -74,7 +82,7 @@ class RedisCircuitBreaker:
 
     def _keys(self, provider: str) -> list[str]:
         base = f"{self._prefix}:{{{provider}}}"  # hash tag keeps all keys on one cluster slot
-        return [f"{base}:failures", f"{base}:open_until", f"{base}:probe"]
+        return [f"{base}:failures", f"{base}:open_until", f"{base}:probe", f"{base}:forced"]
 
     async def allow(self, provider: str) -> bool:
         if self._closed_until.get(provider, 0.0) > self._clock():
@@ -97,16 +105,36 @@ class RedisCircuitBreaker:
         if self._closed_until.get(provider, 0.0) > self._clock():
             return False
         try:
-            async with self._redis.pipeline(transaction=False) as pipe:
-                pipe.time()
-                pipe.get(self._keys(provider)[1])
-                (seconds, micros), open_until = await pipe.execute()
+            return await self.state(provider) in ("open", "forced_down")
         except RedisError:
             _redis_down("is_open")
             return False
+
+    async def state(self, provider: str) -> str:
+        _, open_key, probe_key, forced_key = self._keys(provider)
+        async with self._redis.pipeline(transaction=False) as pipe:
+            pipe.time()
+            pipe.get(open_key)
+            pipe.exists(probe_key)
+            pipe.exists(forced_key)
+            (seconds, micros), open_until, probing, forced = await pipe.execute()
+        if forced:
+            return "forced_down"
         if open_until is None:
-            return False
-        return int(seconds) * 1000 + int(micros) // 1000 < int(open_until)
+            return "closed"
+        now_ms = int(seconds) * 1000 + int(micros) // 1000
+        return "open" if now_ms < int(open_until) and not probing else "half_open"
+
+    async def set_forced_down(self, provider: str, down: bool) -> None:
+        forced_key = self._keys(provider)[3]
+        if down:
+            await self._redis.set(forced_key, "1")
+            BREAKER_STATE.labels(provider).set(OPEN)
+        else:
+            await self._redis.delete(forced_key)
+            BREAKER_STATE.labels(provider).set(CLOSED)
+        # This replica sees the change at once; others within closed_cache_s (1 s).
+        self._closed_until.pop(provider, None)
 
     def _end_probe(self, provider: str) -> bool:
         held = self._probes.get(provider, 0)
@@ -118,7 +146,7 @@ class RedisCircuitBreaker:
         if not self._end_probe(provider):
             return  # closed circuit: nothing to change, no Redis call
         try:
-            closed = int(await self._success(keys=self._keys(provider)))
+            closed = int(await self._success(keys=self._keys(provider)[:3]))
         except RedisError:
             _redis_down("record_success")
             return
@@ -137,7 +165,7 @@ class RedisCircuitBreaker:
             _ms(c.cooldown_s + c.idle_reset_s),
         ]
         try:
-            is_open = bool(int(await self._failure(keys=self._keys(provider), args=args)))
+            is_open = bool(int(await self._failure(keys=self._keys(provider)[:3], args=args)))
         except RedisError:
             _redis_down("record_failure")
             return False
