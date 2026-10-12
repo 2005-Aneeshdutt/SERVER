@@ -73,3 +73,7 @@ IN_FLIGHT = Gauge("gateway_in_flight_requests", "Requests this replica is curren
 REQUESTS_SHED = Counter(
     "gateway_requests_shed_total", "Requests rejected with 503 because the replica was at capacity"
 )
+SPEND_SETTLE_FAILURES = Counter(
+    "gateway_spend_settle_failures_total",
+    "Served requests whose cost never reached the Redis spend total (settle retries exhausted)",
+)

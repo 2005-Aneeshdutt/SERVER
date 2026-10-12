@@ -113,6 +113,7 @@ async def build_container(settings: Settings) -> Container:
     key_store = SqlKeyStore(sessions)
     await asyncio.to_thread(tokens.warm_up)
     router = await build_router(settings, registry, breaker)
+    spend = RedisSpendLimiter(redis, SqlSpendLedger(sessions), settings.spend_reservation_ttl_s)
     return Container(
         settings=settings,
         registry=registry,
@@ -124,7 +125,7 @@ async def build_container(settings: Settings) -> Container:
         breaker=breaker,
         dispatcher=make_dispatcher(settings, registry, providers, breaker),
         rate_limiter=RedisRateLimiter(redis),
-        spend=RedisSpendLimiter(redis, SqlSpendLedger(sessions), settings.spend_reservation_ttl_s),
+        spend=spend,
         cache=RedisResponseCache(
             redis, settings.cache_ttl_s, lock_ttl_s=settings.total_timeout_s + 5
         ),
@@ -138,6 +139,7 @@ async def build_container(settings: Settings) -> Container:
             **({"postgres_replica": _postgres_check(replica_engine)} if replica_engine else {}),
         },
         closers=[
+            spend.close,  # before redis.aclose: pending settle retries need Redis
             http_client.aclose,
             engine.dispose,
             redis.aclose,

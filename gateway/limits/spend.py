@@ -5,11 +5,14 @@ reserve(): before calling upstream, atomically check  spent + reserved + worst_c
            parallel requests can never jointly overshoot the cap.
 settle():  after the request (success, error, or client disconnect), release the reservation
            and add the actual cost.
+Settle is idempotent and retried in the background if Redis blips, so a served request's cost
+always reaches the total while its (worst-case) reservation still holds the budget.
 Reservations expire, so a crashed replica can't leak budget forever. Redis is the hot path;
 Postgres (`requests.cost_usd`) is the durable ledger used to rebuild the Redis total if it's
 missing. Fails CLOSED on Redis errors. See docs/decisions/0009.
 """
 
+import asyncio
 import logging
 import uuid
 from dataclasses import dataclass
@@ -23,12 +26,15 @@ from redis.exceptions import RedisError
 
 from gateway.core.auth import ApiKeyRecord
 from gateway.core.errors import LimiterUnavailable, SpendCapExceeded
-from gateway.observability.metrics import REDIS_ERRORS
+from gateway.observability.metrics import REDIS_ERRORS, SPEND_SETTLE_FAILURES
 
 log = logging.getLogger(__name__)
 _LUA = Path(__file__).parent / "lua"
 _NANOS_PER_USD = Decimal(10**9)
 _KEY_TTL_MS = 40 * 24 * 3600 * 1000  # outlives the month it belongs to
+# Background settle retries after a Redis error (~35 s in total). The reservation must outlive
+# request + retries, which Settings enforces (spend_reservation_ttl_s).
+SETTLE_RETRY_DELAYS_S = (0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 15.0)
 
 
 def to_nanos(usd: Decimal, *, round_up: bool) -> int:
@@ -73,7 +79,9 @@ class SpendLimiter(Protocol):
         """Hold the estimate, or raise SpendCapExceeded. None if the key has no cap."""
         ...
 
-    async def settle(self, reservation: Reservation, actual_usd: Decimal) -> None: ...
+    async def settle(self, reservation: Reservation, actual_usd: Decimal) -> None:
+        """Never raises: a response that was already served must not fail on bookkeeping."""
+        ...
 
     async def remaining(self, key: ApiKeyRecord) -> Decimal | None:
         """Cap minus settled minus reserved, or None if uncapped/unknown. Advisory only
@@ -83,9 +91,16 @@ class SpendLimiter(Protocol):
 
 class RedisSpendLimiter:
     def __init__(
-        self, redis: Redis, ledger: SpendLedger, reservation_ttl_s: float, prefix: str = "spend"
+        self,
+        redis: Redis,
+        ledger: SpendLedger,
+        reservation_ttl_s: float,
+        prefix: str = "spend",
+        retry_delays_s: tuple[float, ...] = SETTLE_RETRY_DELAYS_S,
     ) -> None:
         self._redis = redis
+        self._retry_delays_s = retry_delays_s
+        self._retries: set[asyncio.Task[None]] = set()
         self._ledger = ledger
         self._reservation_ttl_ms = int(reservation_ttl_s * 1000)
         self._prefix = prefix
@@ -154,12 +169,39 @@ class RedisSpendLimiter:
         return cap - from_nanos(int(spent) + int(reserved or 0))
 
     async def settle(self, reservation: Reservation, actual_usd: Decimal) -> None:
+        if await self._try_settle(reservation, actual_usd):
+            return
+        # Don't hold the response for retries. Until settled, the reservation (>= the actual
+        # cost) keeps that budget held, so the cap stays safe while we retry.
+        task = asyncio.create_task(self._settle_with_retries(reservation, actual_usd))
+        self._retries.add(task)
+        task.add_done_callback(self._retries.discard)
+
+    async def _try_settle(self, reservation: Reservation, actual_usd: Decimal) -> bool:
         keys = self._keys(reservation.key_id, reservation.month)
         args: list[int | str] = [reservation.request_id, to_nanos(actual_usd, round_up=False)]
         try:
-            await self._settle(keys=keys, args=args)
+            await self._settle(keys=keys, args=args)  # idempotent: safe to retry
         except RedisError:
-            # The reservation expires on its own; the cost is still in Postgres. Never fail
-            # a response that has already been served.
             REDIS_ERRORS.labels(component="spend_limiter").inc()
-            log.warning("could not settle reservation %s", reservation.request_id)
+            return False
+        return True
+
+    async def _settle_with_retries(self, reservation: Reservation, actual_usd: Decimal) -> None:
+        for delay in self._retry_delays_s:
+            await asyncio.sleep(delay)
+            if await self._try_settle(reservation, actual_usd):
+                return
+        # The reservation will expire and this request's cost never reaches the Redis total
+        # (Postgres still has it). Count it: this under-counts the key's spend.
+        SPEND_SETTLE_FAILURES.inc()
+        log.error(
+            "could not settle reservation %s ($%s) after retries",
+            reservation.request_id,
+            actual_usd,
+        )
+
+    async def close(self) -> None:
+        """On shutdown, give pending settle retries a last chance to land."""
+        if self._retries:
+            await asyncio.wait(set(self._retries), timeout=5)
