@@ -15,7 +15,11 @@ import time
 import openai
 from openai.types.chat import ChatCompletionMessageParam
 
-DEFAULT_ALIASES = "groq-llama-8b,gemini-flash"
+DEFAULT_ALIASES = "groq-gpt-oss-20b,gemini-flash"
+# Reasoning models (gpt-oss) spend output tokens thinking before they answer.
+MAX_TOKENS = 256
+# Exercise the real providers, not the response cache.
+NO_CACHE = {"X-Gateway-Cache": "skip"}
 PROMPT: list[ChatCompletionMessageParam] = [
     {"role": "user", "content": "Reply with exactly: gateway ok"}
 ]
@@ -24,7 +28,11 @@ PROMPT: list[ChatCompletionMessageParam] = [
 async def non_streaming(client: openai.AsyncOpenAI, alias: str) -> str:
     started = time.perf_counter()
     raw = await client.chat.completions.with_raw_response.create(
-        model=alias, messages=PROMPT, max_tokens=20, temperature=0
+        model=alias,
+        messages=PROMPT,
+        max_tokens=MAX_TOKENS,
+        temperature=0,
+        extra_headers=NO_CACHE,
     )
     completion = raw.parse()
     elapsed = (time.perf_counter() - started) * 1000
@@ -41,8 +49,9 @@ async def streaming(client: openai.AsyncOpenAI, alias: str) -> str:
     stream = await client.chat.completions.create(
         model=alias,
         messages=PROMPT,
-        max_tokens=20,
+        max_tokens=MAX_TOKENS,
         temperature=0,
+        extra_headers=NO_CACHE,
         stream=True,
         stream_options={"include_usage": True},
     )
