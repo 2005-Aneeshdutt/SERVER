@@ -1,20 +1,21 @@
 # Model registry. Prices are USD per 1M tokens, written as strings so they parse to exact Decimals.
 # Verify prices against each provider's pricing page before relying on cost numbers.
 models:
-  groq-llama-8b:
+  # Groq retired its Llama 3.x models; it now serves OpenAI's open-weight gpt-oss models.
+  groq-gpt-oss-20b:
     provider: groq
-    upstream_model: llama-3.1-8b-instant
-    input_price_per_mtok: "0.05"
-    output_price_per_mtok: "0.08"
+    upstream_model: openai/gpt-oss-20b
+    input_price_per_mtok: "0.075"
+    output_price_per_mtok: "0.30"
     context_window: 131072
     tier: cheap
     fallbacks: [or-llama-8b, gemini-flash-lite]
 
-  groq-llama-70b:
+  groq-gpt-oss-120b:
     provider: groq
-    upstream_model: llama-3.3-70b-versatile
-    input_price_per_mtok: "0.59"
-    output_price_per_mtok: "0.79"
+    upstream_model: openai/gpt-oss-120b
+    input_price_per_mtok: "0.15"
+    output_price_per_mtok: "0.60"
     context_window: 131072
     tier: strong
     fallbacks: [or-llama-70b, gemini-flash]
@@ -47,7 +48,7 @@ models:
     context_window: 128000
     tier: cheap
     supports_vision: true
-    fallbacks: [groq-llama-8b]
+    fallbacks: [groq-gpt-oss-20b]
 
   claude-haiku:
     provider: anthropic
