@@ -41,6 +41,7 @@ def settings() -> Settings:
         openai_api_key=SecretStr("openai-secret"),
         anthropic_api_key=SecretStr("anthropic-secret"),
         openrouter_api_key=SecretStr("openrouter-secret"),
+        admin_token=SecretStr("test-admin-token"),
         first_token_timeout_s=2,
         total_timeout_s=5,
     )

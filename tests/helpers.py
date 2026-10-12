@@ -169,6 +169,15 @@ class FakeBreaker:
     async def is_open(self, provider: str) -> bool:
         return provider in self.open
 
+    async def state(self, provider: str) -> str:
+        return "open" if provider in self.open else "closed"
+
+    async def set_forced_down(self, provider: str, down: bool) -> None:
+        if down:
+            self.open.add(provider)
+        else:
+            self.open.discard(provider)
+
 
 async def no_sleep(_: float) -> None:
     return None
