@@ -3,7 +3,7 @@
 from decimal import Decimal
 from functools import lru_cache
 
-from pydantic import SecretStr
+from pydantic import SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -79,6 +79,14 @@ class Settings(BaseSettings):
     key_cache_max_entries: int = 10_000
     log_queue_size: int = 10_000
     log_batch_size: int = 200
+
+    @model_validator(mode="after")
+    def _reservations_outlive_requests(self) -> "Settings":
+        # A reservation must still exist when its request settles (or retries settling), or
+        # the request's cost is never added to the spend total. 60 s covers the settle retries.
+        if self.spend_reservation_ttl_s < self.total_timeout_s + 60:
+            raise ValueError("spend_reservation_ttl_s must be >= total_timeout_s + 60")
+        return self
 
 
 @lru_cache
