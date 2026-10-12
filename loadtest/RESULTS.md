@@ -80,6 +80,36 @@ Gateway overhead until the first content chunk is forwarded: p50 5.5 ms, p99 26.
 
 3 replicas at 100 RPS for 30 s; one replica is stopped (`docker stop`: graceful SIGTERM) 10 s in. Success rate: **100.00%**, p99 latency 153.6 ms.
 
+## Past saturation: load shedding off vs on (1 replica)
+
+Same arrival rates, one replica (saturates at ~80 RPS). **On** = at most 16 requests in flight per replica; the rest get an immediate `503` + `Retry-After: 1`. Goodput = successful responses per second. Latency is for successful requests only, so fast 503s don't flatter it. Dropped = arrivals k6 couldn't even send (all its virtual users were stuck waiting).
+
+| Offered RPS | Shedding | Goodput | Shed | OK latency p50 / p99 (ms) | Dropped |
+|---|---|---|---|---|---|
+| 60 | off | 59.3 | 0.0% | 114.5 / 164.5 | 0 |
+| 60 | on | 59.7 | 0.0% | 112.8 / 126.9 | 0 |
+| 80 | off | 66.3 | 0.0% | 159.4 / 6455.0 | 95 |
+| 80 | on | 78.8 | 0.3% | 120.1 / 230.5 | 0 |
+| 100 | off | 48.6 | 0.0% | 4468.0 / 19089.9 | 787 |
+| 100 | on | 90.4 | 8.2% | 152.9 / 286.6 | 0 |
+| 130 | off | 46.5 | 0.0% | 7177.6 / 23866.2 | 1329 |
+| 130 | on | 88.5 | 31.5% | 168.2 / 365.9 | 0 |
+| 160 | off | 50.5 | 0.0% | 7737.9 / 25080.4 | 1749 |
+| 160 | on | 84.7 | 46.7% | 178.3 / 621.5 | 0 |
+| 200 | off | 49.3 | 3.8% | 8680.7 / 28332.8 | 2299 |
+| 200 | on | 76.0 | 61.5% | 196.7 / 472.5 | 0 |
+
+### Choosing the cap
+
+Shedding on, one replica. Goodput (OK latency p99) at each offered rate:
+
+| Cap | 80 RPS | 130 RPS | 200 RPS |
+|---|---|---|---|
+| 8 | 62.8 (150.3 ms) | 58.5 (231.3 ms) | 60.9 (173.0 ms) |
+| 16 (chosen) | 79.6 (176.5 ms) | 73.7 (909.9 ms) | 93.8 (312.5 ms) |
+| 32 | 79.1 (185.4 ms) | 75.9 (1391.6 ms) | 70.1 (1647.6 ms) |
+| 64 | 79.1 (294.8 ms) | 64.7 (4160.6 ms) | 57.4 (4151.8 ms) |
+
 ## Analysis
 
 ### Headline
@@ -102,9 +132,23 @@ event loop = one core), while the shared dependencies have plenty of headroom:
 | Postgres primary | ≤ 27% (peak across steps) |
 | nginx | < 10% |
 
-So capacity is **gateway CPU per request**, not Redis, Postgres or nginx. Past saturation the
-gateway doesn't error; latency explodes from queueing (p99 jumps from ~150 ms to 8–14 s). See
-"what I'd change" for load shedding.
+So capacity is **gateway CPU per request**, not Redis, Postgres or nginx. Without load shedding,
+the gateway doesn't error past saturation. Instead latency explodes from queueing (p99 jumps from
+~150 ms to 8–28 s), and goodput *falls* below capacity.
+
+### Load shedding (added after the first sweep)
+Each replica now caps in-flight requests (`MAX_IN_FLIGHT`) and answers the excess with an
+immediate `503` + `Retry-After: 1`. With one replica pushed to 100–200 RPS (1.25–2.5× capacity):
+- **p99 of successful requests: 19–28 s → 0.29–0.62 s**
+- **goodput: ~49 → 76–90 RPS** (a queueing replica wastes CPU on requests whose clients
+  already gave up)
+- **k6 dropped iterations: up to 2,299 → 0**
+
+The cap (16) comes from Little's law: 80 RPS × 0.125 s ≈ 10 in flight at saturation, plus
+headroom. The cap study above shows that 8 starves the replica and 64 lets the queue (and the
+latency) come back. A real LLM upstream (seconds, not 100 ms) needs a much higher cap, which is
+why the production default is 512. See
+[ADR 0014](../docs/decisions/0014-load-shedding.md).
 
 ### CPU per request, and what I did about it
 Measured from the container's cgroup CPU counter over 1,000 requests at 50 RPS:
@@ -163,8 +207,9 @@ After both fixes: **100.00%** success through the replica kill.
 ### What I'd change for production
 - **Workers per container = cores** (`uvicorn --workers N`, or one process per container with
   more containers). One event loop per core is the scaling unit.
-- **Load shedding:** cap in-flight requests per replica and return 503 + `Retry-After` past
-  that, instead of letting latency grow to seconds.
+- **Adaptive load shedding:** the static cap above has to be tuned to upstream latency. An
+  AIMD/gradient limit (like Netflix's `concurrency-limits`) or shedding on event-loop lag would
+  track it automatically.
 - **Pipeline the release phase** (spend settle + TPM true-up in one Redis round trip: 4 → 3).
 - **Redis Cluster** past ~1k RPS: every key is already hash-tagged per API key or provider
   (`{...}`), so each Lua script touches a single slot and shards cleanly.

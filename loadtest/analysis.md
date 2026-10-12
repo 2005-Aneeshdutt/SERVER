@@ -20,9 +20,23 @@ event loop = one core), while the shared dependencies have plenty of headroom:
 | Postgres primary | ≤ 27% (peak across steps) |
 | nginx | < 10% |
 
-So capacity is **gateway CPU per request**, not Redis, Postgres or nginx. Past saturation the
-gateway doesn't error; latency explodes from queueing (p99 jumps from ~150 ms to 8–14 s). See
-"what I'd change" for load shedding.
+So capacity is **gateway CPU per request**, not Redis, Postgres or nginx. Without load shedding,
+the gateway doesn't error past saturation. Instead latency explodes from queueing (p99 jumps from
+~150 ms to 8–28 s), and goodput *falls* below capacity.
+
+### Load shedding (added after the first sweep)
+Each replica now caps in-flight requests (`MAX_IN_FLIGHT`) and answers the excess with an
+immediate `503` + `Retry-After: 1`. With one replica pushed to 100–200 RPS (1.25–2.5× capacity):
+- **p99 of successful requests: 19–28 s → 0.29–0.62 s**
+- **goodput: ~49 → 76–90 RPS** (a queueing replica wastes CPU on requests whose clients
+  already gave up)
+- **k6 dropped iterations: up to 2,299 → 0**
+
+The cap (16) comes from Little's law: 80 RPS × 0.125 s ≈ 10 in flight at saturation, plus
+headroom. The cap study above shows that 8 starves the replica and 64 lets the queue (and the
+latency) come back. A real LLM upstream (seconds, not 100 ms) needs a much higher cap, which is
+why the production default is 512. See
+[ADR 0014](../docs/decisions/0014-load-shedding.md).
 
 ### CPU per request, and what I did about it
 Measured from the container's cgroup CPU counter over 1,000 requests at 50 RPS:
@@ -81,8 +95,9 @@ After both fixes: **100.00%** success through the replica kill.
 ### What I'd change for production
 - **Workers per container = cores** (`uvicorn --workers N`, or one process per container with
   more containers). One event loop per core is the scaling unit.
-- **Load shedding:** cap in-flight requests per replica and return 503 + `Retry-After` past
-  that, instead of letting latency grow to seconds.
+- **Adaptive load shedding:** the static cap above has to be tuned to upstream latency. An
+  AIMD/gradient limit (like Netflix's `concurrency-limits`) or shedding on event-loop lag would
+  track it automatically.
 - **Pipeline the release phase** (spend settle + TPM true-up in one Redis round trip: 4 → 3).
 - **Redis Cluster** past ~1k RPS: every key is already hash-tagged per API key or provider
   (`{...}`), so each Lua script touches a single slot and shards cleanly.

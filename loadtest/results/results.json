@@ -841,5 +841,821 @@
       "redis-1": 13.6
     },
     "sustained": true
+  },
+  "overload": {
+    "replicas": 1,
+    "cap": 16,
+    "runs": {
+      "off": [
+        {
+          "target_rps": 60,
+          "achieved_rps": 59.3,
+          "success_rate": 1.0,
+          "latency_ms": {
+            "med": 114.55,
+            "p(95)": 135.09,
+            "p(99)": 164.46
+          },
+          "gateway_overhead_ms": {
+            "med": 4.61,
+            "p(95)": 11.39,
+            "p(99)": 18.74
+          },
+          "ok_latency_ms": {
+            "med": 114.55,
+            "p(95)": 135.09,
+            "p(99)": 164.46
+          },
+          "goodput_rps": 59.3,
+          "shed_rate": 0.0,
+          "dropped_iterations": 0,
+          "cpu_percent": {
+            "k6-run-3a1cc1a19639": 19.61,
+            "api-1": 104.1,
+            "mock-llm-1": 10.05,
+            "nginx-1": 3.44,
+            "postgres-replica-1": 12.21,
+            "postgres-1": 18.6,
+            "redis-1": 16.15
+          },
+          "sustained": true
+        },
+        {
+          "target_rps": 80,
+          "achieved_rps": 66.3,
+          "success_rate": 1.0,
+          "latency_ms": {
+            "med": 159.38,
+            "p(95)": 3999.99,
+            "p(99)": 6454.96
+          },
+          "gateway_overhead_ms": {
+            "med": 19.82,
+            "p(95)": 122.12,
+            "p(99)": 322.51
+          },
+          "ok_latency_ms": {
+            "med": 159.38,
+            "p(95)": 3999.99,
+            "p(99)": 6454.96
+          },
+          "goodput_rps": 66.3,
+          "shed_rate": 0.0,
+          "dropped_iterations": 95,
+          "cpu_percent": {
+            "k6-run-e8463b12fa0f": 19.38,
+            "api-1": 117.12,
+            "mock-llm-1": 9.69,
+            "nginx-1": 3.62,
+            "postgres-replica-1": 2.4,
+            "postgres-1": 2.03,
+            "redis-1": 16.19
+          },
+          "sustained": false
+        },
+        {
+          "target_rps": 100,
+          "achieved_rps": 48.6,
+          "success_rate": 1.0,
+          "latency_ms": {
+            "med": 4467.99,
+            "p(95)": 15090.18,
+            "p(99)": 19089.91
+          },
+          "gateway_overhead_ms": {
+            "med": 146.82,
+            "p(95)": 249.15,
+            "p(99)": 460.87
+          },
+          "ok_latency_ms": {
+            "med": 4467.99,
+            "p(95)": 15090.18,
+            "p(99)": 19089.91
+          },
+          "goodput_rps": 48.6,
+          "shed_rate": 0.0,
+          "dropped_iterations": 787,
+          "cpu_percent": {
+            "k6-run-4d807aec4d17": 14.1,
+            "api-1": 102.55,
+            "mock-llm-1": 7.59,
+            "nginx-1": 1.75,
+            "postgres-replica-1": 2.03,
+            "postgres-1": 2.1,
+            "redis-1": 7.96
+          },
+          "sustained": false
+        },
+        {
+          "target_rps": 130,
+          "achieved_rps": 46.5,
+          "success_rate": 1.0,
+          "latency_ms": {
+            "med": 7177.59,
+            "p(95)": 19206.27,
+            "p(99)": 23866.22
+          },
+          "gateway_overhead_ms": {
+            "med": 173.49,
+            "p(95)": 378.59,
+            "p(99)": 697.11
+          },
+          "ok_latency_ms": {
+            "med": 7177.59,
+            "p(95)": 19206.27,
+            "p(99)": 23866.22
+          },
+          "goodput_rps": 46.5,
+          "shed_rate": 0.0,
+          "dropped_iterations": 1329,
+          "cpu_percent": {
+            "k6-run-a86a3f33cd66": 15.84,
+            "api-1": 101.6,
+            "mock-llm-1": 6.68,
+            "nginx-1": 1.79,
+            "postgres-replica-1": 8.78,
+            "postgres-1": 7.89,
+            "redis-1": 10.93
+          },
+          "sustained": false
+        },
+        {
+          "target_rps": 160,
+          "achieved_rps": 50.5,
+          "success_rate": 1.0,
+          "latency_ms": {
+            "med": 7737.89,
+            "p(95)": 20936.47,
+            "p(99)": 25080.43
+          },
+          "gateway_overhead_ms": {
+            "med": 155.86,
+            "p(95)": 219.81,
+            "p(99)": 542.33
+          },
+          "ok_latency_ms": {
+            "med": 7737.89,
+            "p(95)": 20936.47,
+            "p(99)": 25080.43
+          },
+          "goodput_rps": 50.5,
+          "shed_rate": 0.0,
+          "dropped_iterations": 1749,
+          "cpu_percent": {
+            "k6-run-8aaf4e6353e1": 13.93,
+            "api-1": 100.88,
+            "mock-llm-1": 7.16,
+            "nginx-1": 1.9,
+            "postgres-replica-1": 13.34,
+            "postgres-1": 0.99,
+            "redis-1": 7.24
+          },
+          "sustained": false
+        },
+        {
+          "target_rps": 200,
+          "achieved_rps": 51.3,
+          "success_rate": 0.9618,
+          "latency_ms": {
+            "med": 7727.25,
+            "p(95)": 25055.35,
+            "p(99)": 28314.4
+          },
+          "gateway_overhead_ms": {
+            "med": 253.89,
+            "p(95)": 1307.93,
+            "p(99)": 2169.35
+          },
+          "ok_latency_ms": {
+            "med": 8680.68,
+            "p(95)": 25165.63,
+            "p(99)": 28332.8
+          },
+          "goodput_rps": 49.3,
+          "shed_rate": 0.0382,
+          "dropped_iterations": 2299,
+          "cpu_percent": {
+            "k6-run-0f3fbccb4dec": 12.78,
+            "api-1": 103.17,
+            "mock-llm-1": 5.61,
+            "nginx-1": 2.17,
+            "postgres-replica-1": 13.97,
+            "postgres-1": 8.08,
+            "redis-1": 16.89
+          },
+          "sustained": false
+        }
+      ],
+      "on": [
+        {
+          "target_rps": 60,
+          "achieved_rps": 59.7,
+          "success_rate": 1.0,
+          "latency_ms": {
+            "med": 112.79,
+            "p(95)": 121.73,
+            "p(99)": 126.86
+          },
+          "gateway_overhead_ms": {
+            "med": 4.17,
+            "p(95)": 7.54,
+            "p(99)": 10.34
+          },
+          "ok_latency_ms": {
+            "med": 112.79,
+            "p(95)": 121.73,
+            "p(99)": 126.86
+          },
+          "goodput_rps": 59.7,
+          "shed_rate": 0.0,
+          "dropped_iterations": 0,
+          "cpu_percent": {
+            "k6-run-665b6139d6f7": 13.39,
+            "api-1": 88.25,
+            "mock-llm-1": 9.34,
+            "nginx-1": 3.34,
+            "postgres-replica-1": 9.43,
+            "postgres-1": 10.99,
+            "redis-1": 8.19
+          },
+          "sustained": true
+        },
+        {
+          "target_rps": 80,
+          "achieved_rps": 79.1,
+          "success_rate": 0.9969,
+          "latency_ms": {
+            "med": 120.08,
+            "p(95)": 150.79,
+            "p(99)": 230.38
+          },
+          "gateway_overhead_ms": {
+            "med": 6.25,
+            "p(95)": 16.21,
+            "p(99)": 29.18
+          },
+          "ok_latency_ms": {
+            "med": 120.12,
+            "p(95)": 150.82,
+            "p(99)": 230.52
+          },
+          "goodput_rps": 78.8,
+          "shed_rate": 0.0031,
+          "dropped_iterations": 0,
+          "cpu_percent": {
+            "k6-run-97cdc4d6ef08": 16.43,
+            "api-1": 111.47,
+            "mock-llm-1": 11.48,
+            "nginx-1": 3.77,
+            "postgres-replica-1": 6.02,
+            "postgres-1": 18.03,
+            "redis-1": 10.32
+          },
+          "sustained": true
+        },
+        {
+          "target_rps": 100,
+          "achieved_rps": 98.4,
+          "success_rate": 0.9185,
+          "latency_ms": {
+            "med": 149.68,
+            "p(95)": 219.22,
+            "p(99)": 279.98
+          },
+          "gateway_overhead_ms": {
+            "med": 16.92,
+            "p(95)": 33.18,
+            "p(99)": 40.93
+          },
+          "ok_latency_ms": {
+            "med": 152.93,
+            "p(95)": 224.93,
+            "p(99)": 286.65
+          },
+          "goodput_rps": 90.4,
+          "shed_rate": 0.0815,
+          "dropped_iterations": 0,
+          "cpu_percent": {
+            "k6-run-be82d787bd84": 22.76,
+            "api-1": 100.23,
+            "mock-llm-1": 14.04,
+            "nginx-1": 4.88,
+            "postgres-replica-1": 4.84,
+            "postgres-1": 10.72,
+            "redis-1": 11.41
+          },
+          "sustained": false
+        },
+        {
+          "target_rps": 130,
+          "achieved_rps": 129.1,
+          "success_rate": 0.6854,
+          "latency_ms": {
+            "med": 154.31,
+            "p(95)": 248.78,
+            "p(99)": 338.42
+          },
+          "gateway_overhead_ms": {
+            "med": 21.48,
+            "p(95)": 41.98,
+            "p(99)": 54.4
+          },
+          "ok_latency_ms": {
+            "med": 168.18,
+            "p(95)": 263.54,
+            "p(99)": 365.94
+          },
+          "goodput_rps": 88.5,
+          "shed_rate": 0.3146,
+          "dropped_iterations": 0,
+          "cpu_percent": {
+            "k6-run-f27ab331587c": 32.86,
+            "api-1": 102.73,
+            "mock-llm-1": 13.71,
+            "nginx-1": 6.4,
+            "postgres-replica-1": 9.3,
+            "postgres-1": 7.55,
+            "redis-1": 15.99
+          },
+          "sustained": false
+        },
+        {
+          "target_rps": 160,
+          "achieved_rps": 159.1,
+          "success_rate": 0.5326,
+          "latency_ms": {
+            "med": 145.89,
+            "p(95)": 273.0,
+            "p(99)": 464.96
+          },
+          "gateway_overhead_ms": {
+            "med": 23.4,
+            "p(95)": 38.41,
+            "p(99)": 46.22
+          },
+          "ok_latency_ms": {
+            "med": 178.32,
+            "p(95)": 282.72,
+            "p(99)": 621.54
+          },
+          "goodput_rps": 84.7,
+          "shed_rate": 0.4674,
+          "dropped_iterations": 0,
+          "cpu_percent": {
+            "k6-run-24994318489e": 38.76,
+            "api-1": 101.24,
+            "mock-llm-1": 12.66,
+            "nginx-1": 7.44,
+            "postgres-replica-1": 3.28,
+            "postgres-1": 5.57,
+            "redis-1": 10.61
+          },
+          "sustained": false
+        },
+        {
+          "target_rps": 200,
+          "achieved_rps": 197.3,
+          "success_rate": 0.3854,
+          "latency_ms": {
+            "med": 13.46,
+            "p(95)": 281.43,
+            "p(99)": 392.61
+          },
+          "gateway_overhead_ms": {
+            "med": 27.34,
+            "p(95)": 53.23,
+            "p(99)": 69.36
+          },
+          "ok_latency_ms": {
+            "med": 196.7,
+            "p(95)": 348.57,
+            "p(99)": 472.53
+          },
+          "goodput_rps": 76.0,
+          "shed_rate": 0.6146,
+          "dropped_iterations": 0,
+          "cpu_percent": {
+            "k6-run-325722fe001d": 38.19,
+            "api-1": 101.02,
+            "mock-llm-1": 11.24,
+            "nginx-1": 9.27,
+            "postgres-replica-1": 2.72,
+            "postgres-1": 11.67,
+            "redis-1": 20.59
+          },
+          "sustained": false
+        }
+      ]
+    },
+    "cap_study": [
+      {
+        "cap": 8,
+        "target_rps": 80,
+        "achieved_rps": 79.2,
+        "success_rate": 0.7931,
+        "latency_ms": {
+          "med": 115.29,
+          "p(95)": 130.26,
+          "p(99)": 145.07
+        },
+        "gateway_overhead_ms": {
+          "med": 5.45,
+          "p(95)": 10.88,
+          "p(99)": 14.44
+        },
+        "ok_latency_ms": {
+          "med": 116.86,
+          "p(95)": 131.76,
+          "p(99)": 150.33
+        },
+        "goodput_rps": 62.8,
+        "shed_rate": 0.2069,
+        "dropped_iterations": 0,
+        "cpu_percent": {
+          "k6-run-1ec803b3682e": 19.62,
+          "api-1": 72.02,
+          "mock-llm-1": 9.85,
+          "nginx-1": 3.6,
+          "postgres-replica-1": 5.44,
+          "postgres-1": 16.73,
+          "redis-1": 8.55
+        },
+        "sustained": false
+      },
+      {
+        "cap": 8,
+        "target_rps": 130,
+        "achieved_rps": 128.4,
+        "success_rate": 0.4558,
+        "latency_ms": {
+          "med": 7.15,
+          "p(95)": 160.39,
+          "p(99)": 198.72
+        },
+        "gateway_overhead_ms": {
+          "med": 9.04,
+          "p(95)": 24.99,
+          "p(99)": 34.26
+        },
+        "ok_latency_ms": {
+          "med": 127.18,
+          "p(95)": 178.01,
+          "p(99)": 231.27
+        },
+        "goodput_rps": 58.5,
+        "shed_rate": 0.5442,
+        "dropped_iterations": 0,
+        "cpu_percent": {
+          "k6-run-66d9ef72504e": 32.58,
+          "api-1": 83.62,
+          "mock-llm-1": 9.73,
+          "nginx-1": 6.42,
+          "postgres-replica-1": 3.72,
+          "postgres-1": 17.14,
+          "redis-1": 8.9
+        },
+        "sustained": false
+      },
+      {
+        "cap": 8,
+        "target_rps": 200,
+        "achieved_rps": 198.8,
+        "success_rate": 0.3065,
+        "latency_ms": {
+          "med": 3.13,
+          "p(95)": 142.88,
+          "p(99)": 160.83
+        },
+        "gateway_overhead_ms": {
+          "med": 9.57,
+          "p(95)": 19.27,
+          "p(99)": 24.4
+        },
+        "ok_latency_ms": {
+          "med": 129.6,
+          "p(95)": 157.51,
+          "p(99)": 172.97
+        },
+        "goodput_rps": 60.9,
+        "shed_rate": 0.6935,
+        "dropped_iterations": 0,
+        "cpu_percent": {
+          "k6-run-5cd41bcd7a73": 37.64,
+          "api-1": 77.65,
+          "mock-llm-1": 9.61,
+          "nginx-1": 9.65,
+          "postgres-replica-1": 4.2,
+          "postgres-1": 77.36,
+          "redis-1": 16.36
+        },
+        "sustained": false
+      },
+      {
+        "cap": 16,
+        "target_rps": 80,
+        "achieved_rps": 79.6,
+        "success_rate": 1.0,
+        "latency_ms": {
+          "med": 119.12,
+          "p(95)": 151.46,
+          "p(99)": 176.49
+        },
+        "gateway_overhead_ms": {
+          "med": 6.26,
+          "p(95)": 17.44,
+          "p(99)": 26.52
+        },
+        "ok_latency_ms": {
+          "med": 119.12,
+          "p(95)": 151.46,
+          "p(99)": 176.49
+        },
+        "goodput_rps": 79.6,
+        "shed_rate": 0.0,
+        "dropped_iterations": 0,
+        "cpu_percent": {
+          "k6-run-db706e9fd431": 16.98,
+          "api-1": 92.85,
+          "mock-llm-1": 11.55,
+          "nginx-1": 3.76,
+          "postgres-replica-1": 5.9,
+          "postgres-1": 17.15,
+          "redis-1": 10.01
+        },
+        "sustained": true
+      },
+      {
+        "cap": 16,
+        "target_rps": 130,
+        "achieved_rps": 128.2,
+        "success_rate": 0.5748,
+        "latency_ms": {
+          "med": 141.34,
+          "p(95)": 369.7,
+          "p(99)": 830.4
+        },
+        "gateway_overhead_ms": {
+          "med": 22.37,
+          "p(95)": 90.37,
+          "p(99)": 152.46
+        },
+        "ok_latency_ms": {
+          "med": 171.17,
+          "p(95)": 473.36,
+          "p(99)": 909.94
+        },
+        "goodput_rps": 73.7,
+        "shed_rate": 0.4252,
+        "dropped_iterations": 0,
+        "cpu_percent": {
+          "k6-run-ec140cb447be": 37.24,
+          "api-1": 126.63,
+          "mock-llm-1": 7.61,
+          "nginx-1": 10.52,
+          "postgres-replica-1": 0.95,
+          "postgres-1": 2.5,
+          "redis-1": 8.67
+        },
+        "sustained": false
+      },
+      {
+        "cap": 16,
+        "target_rps": 200,
+        "achieved_rps": 197.5,
+        "success_rate": 0.4746,
+        "latency_ms": {
+          "med": 12.94,
+          "p(95)": 213.53,
+          "p(99)": 288.45
+        },
+        "gateway_overhead_ms": {
+          "med": 19.38,
+          "p(95)": 32.74,
+          "p(99)": 39.08
+        },
+        "ok_latency_ms": {
+          "med": 163.41,
+          "p(95)": 247.7,
+          "p(99)": 312.51
+        },
+        "goodput_rps": 93.8,
+        "shed_rate": 0.5254,
+        "dropped_iterations": 0,
+        "cpu_percent": {
+          "k6-run-7bbd324aa1c2": 30.97,
+          "api-1": 98.22,
+          "mock-llm-1": 13.62,
+          "nginx-1": 7.05,
+          "postgres-replica-1": 3.8,
+          "postgres-1": 7.43,
+          "redis-1": 13.53
+        },
+        "sustained": false
+      },
+      {
+        "cap": 32,
+        "target_rps": 80,
+        "achieved_rps": 79.1,
+        "success_rate": 1.0,
+        "latency_ms": {
+          "med": 119.27,
+          "p(95)": 157.54,
+          "p(99)": 185.37
+        },
+        "gateway_overhead_ms": {
+          "med": 6.26,
+          "p(95)": 18.8,
+          "p(99)": 27.89
+        },
+        "ok_latency_ms": {
+          "med": 119.27,
+          "p(95)": 157.54,
+          "p(99)": 185.37
+        },
+        "goodput_rps": 79.1,
+        "shed_rate": 0.0,
+        "dropped_iterations": 0,
+        "cpu_percent": {
+          "k6-run-ef89646ad68e": 19.22,
+          "api-1": 108.98,
+          "mock-llm-1": 12.43,
+          "nginx-1": 3.67,
+          "postgres-replica-1": 10.16,
+          "postgres-1": 9.88,
+          "redis-1": 9.99
+        },
+        "sustained": true
+      },
+      {
+        "cap": 32,
+        "target_rps": 130,
+        "achieved_rps": 128.6,
+        "success_rate": 0.5898,
+        "latency_ms": {
+          "med": 220.13,
+          "p(95)": 836.71,
+          "p(99)": 1278.12
+        },
+        "gateway_overhead_ms": {
+          "med": 40.96,
+          "p(95)": 61.66,
+          "p(99)": 75.97
+        },
+        "ok_latency_ms": {
+          "med": 319.06,
+          "p(95)": 995.88,
+          "p(99)": 1391.6
+        },
+        "goodput_rps": 75.9,
+        "shed_rate": 0.4102,
+        "dropped_iterations": 0,
+        "cpu_percent": {
+          "k6-run-57e374bbcec1": 26.8,
+          "api-1": 102.11,
+          "mock-llm-1": 11.62,
+          "nginx-1": 5.37,
+          "postgres-replica-1": 5.89,
+          "postgres-1": 8.41,
+          "redis-1": 12.0
+        },
+        "sustained": false
+      },
+      {
+        "cap": 32,
+        "target_rps": 200,
+        "achieved_rps": 196.2,
+        "success_rate": 0.3574,
+        "latency_ms": {
+          "med": 16.09,
+          "p(95)": 770.13,
+          "p(99)": 1319.52
+        },
+        "gateway_overhead_ms": {
+          "med": 41.63,
+          "p(95)": 62.93,
+          "p(99)": 71.53
+        },
+        "ok_latency_ms": {
+          "med": 337.23,
+          "p(95)": 1105.55,
+          "p(99)": 1647.62
+        },
+        "goodput_rps": 70.1,
+        "shed_rate": 0.6426,
+        "dropped_iterations": 0,
+        "cpu_percent": {
+          "k6-run-671c01180abe": 30.64,
+          "api-1": 118.01,
+          "mock-llm-1": 10.23,
+          "nginx-1": 7.55,
+          "postgres-replica-1": 2.44,
+          "postgres-1": 8.9,
+          "redis-1": 7.73
+        },
+        "sustained": false
+      },
+      {
+        "cap": 64,
+        "target_rps": 80,
+        "achieved_rps": 79.1,
+        "success_rate": 1.0,
+        "latency_ms": {
+          "med": 117.5,
+          "p(95)": 173.18,
+          "p(99)": 294.77
+        },
+        "gateway_overhead_ms": {
+          "med": 5.6,
+          "p(95)": 19.96,
+          "p(99)": 46.76
+        },
+        "ok_latency_ms": {
+          "med": 117.5,
+          "p(95)": 173.18,
+          "p(99)": 294.77
+        },
+        "goodput_rps": 79.1,
+        "shed_rate": 0.0,
+        "dropped_iterations": 0,
+        "cpu_percent": {
+          "k6-run-6b6ee323c627": 14.44,
+          "api-1": 79.37,
+          "mock-llm-1": 11.57,
+          "nginx-1": 3.17,
+          "postgres-replica-1": 5.62,
+          "postgres-1": 10.65,
+          "redis-1": 8.6
+        },
+        "sustained": true
+      },
+      {
+        "cap": 64,
+        "target_rps": 130,
+        "achieved_rps": 126.3,
+        "success_rate": 0.5119,
+        "latency_ms": {
+          "med": 218.57,
+          "p(95)": 2182.28,
+          "p(99)": 3434.33
+        },
+        "gateway_overhead_ms": {
+          "med": 55.74,
+          "p(95)": 79.83,
+          "p(99)": 101.25
+        },
+        "ok_latency_ms": {
+          "med": 680.69,
+          "p(95)": 2745.74,
+          "p(99)": 4160.55
+        },
+        "goodput_rps": 64.7,
+        "shed_rate": 0.4881,
+        "dropped_iterations": 0,
+        "cpu_percent": {
+          "k6-run-46f16f9fbb8f": 20.22,
+          "api-1": 102.12,
+          "mock-llm-1": 8.66,
+          "nginx-1": 5.07,
+          "postgres-replica-1": 3.56,
+          "postgres-1": 1.96,
+          "redis-1": 7.32
+        },
+        "sustained": false
+      },
+      {
+        "cap": 64,
+        "target_rps": 200,
+        "achieved_rps": 191.1,
+        "success_rate": 0.3002,
+        "latency_ms": {
+          "med": 22.48,
+          "p(95)": 1831.92,
+          "p(99)": 3351.89
+        },
+        "gateway_overhead_ms": {
+          "med": 64.37,
+          "p(95)": 102.47,
+          "p(99)": 279.83
+        },
+        "ok_latency_ms": {
+          "med": 797.5,
+          "p(95)": 2947.78,
+          "p(99)": 4151.82
+        },
+        "goodput_rps": 57.4,
+        "shed_rate": 0.6998,
+        "dropped_iterations": 0,
+        "cpu_percent": {
+          "k6-run-8cc9f08630ff": 38.72,
+          "api-1": 102.24,
+          "mock-llm-1": 8.43,
+          "nginx-1": 7.65,
+          "postgres-replica-1": 2.41,
+          "postgres-1": 7.97,
+          "redis-1": 6.87
+        },
+        "sustained": false
+      }
+    ]
   }
 }
