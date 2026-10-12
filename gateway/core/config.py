@@ -1,5 +1,6 @@
 """Runtime settings, read from environment variables / `.env`."""
 
+from decimal import Decimal
 from functools import lru_cache
 
 from pydantic import SecretStr
@@ -55,6 +56,14 @@ class Settings(BaseSettings):
     # model="auto": classifier exported by eval/ (needs the "router" extra installed).
     router_model_path: str = "gateway/routing/router_model.json"
     router_threads: int = 2
+
+    # Public playground: POST /demo/keys issues throwaway keys with tiny limits.
+    demo_enabled: bool = False
+    demo_spend_cap_usd: Decimal = Decimal("0.02")
+    demo_rpm: int = 10
+    demo_tpm: int = 20_000
+    demo_keys_per_hour: int = 30
+    demo_models: str = "auto,groq-gpt-oss-20b,groq-gpt-oss-120b,gemini-flash-lite,or-llama-8b"
 
     cache_ttl_s: float = 3600.0
     # Max time a request waits for an identical in-flight request before calling upstream itself.
