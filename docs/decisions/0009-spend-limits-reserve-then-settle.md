@@ -49,7 +49,9 @@ is about $9M. Reservations round *up*, settlements round half-up. `Decimal` ever
 - Settle only increments an *existing* total, so a settle racing a hydration can't create a
   partial total.
 - Redis runs with AOF (`appendfsync everysec`), so a Redis restart keeps the totals *and* the
-  in-flight reservations, which Postgres doesn't have.
+  in-flight reservations, which Postgres doesn't have. Its eviction policy is explicitly
+  `noeviction`: the response cache shares this Redis, and an LRU policy could silently evict a
+  reservation under memory pressure.
 
 **Known gap:** log rows are written asynchronously and can be dropped under extreme pressure
 (ADR 0004). If Redis *also* loses its data at that moment, hydration under-counts by those rows.
@@ -58,6 +60,28 @@ That needs two simultaneous failures, it's bounded, and it's visible in
 
 ## Failure mode
 Redis or the ledger is unavailable → **503 (fail closed)**. A spend cap exists to bound money;
-silently disabling it during an outage defeats its purpose. If settle fails *after* a response
-was served, we never fail the response: the reservation expires on its own and the cost is in
-Postgres.
+silently disabling it during an outage defeats its purpose.
+
+### Settle must not lose the cost (fixed after M4)
+If settle fails *after* a response was served, we never fail the response. The first version
+then just logged a warning and said "the cost is in Postgres". **That was wrong.** Postgres only
+helps when the Redis total is *missing* and gets rebuilt. Here the total still existed, so the
+reservation expired a few minutes later and the request's cost silently never counted against
+the cap.
+
+The fix has two parts:
+- **Settle is idempotent.** The Lua script adds the cost only in the same step that removes the
+  reservation. A retry after an ambiguous failure (Redis ran the script, but the reply timed
+  out) finds no reservation and does nothing, so the cost can't be counted twice.
+- **Failed settles retry in the background** (~35 s of backoff), so the response isn't held.
+  While retrying, the reservation, which is the worst case and so ≥ the actual cost, keeps that
+  budget held. The cap is safe the whole time.
+
+This relies on one invariant: **a reservation must outlive its request plus the retry window**.
+Otherwise a slow request's reservation could expire before it settles. `Settings` refuses to
+start unless `spend_reservation_ttl_s >= total_timeout_s + 60`.
+
+If every retry fails (Redis down for more than ~35 s), the cost is lost from the Redis total.
+`gateway_spend_settle_failures_total` counts it, and at that point new requests are already
+failing closed because reserve() needs Redis too. Pending retries get a last chance on graceful
+shutdown.
