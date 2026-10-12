@@ -125,3 +125,15 @@ async def test_closed_state_is_cached_locally_for_a_short_time(redis: Redis, pro
         assert not await replica_a.allow(provider)  # ...and drops the cached "closed"
     finally:
         await other.aclose()
+
+
+async def test_operator_kill_switch_overrides_a_closed_circuit(redis: Redis, provider: str) -> None:
+    breaker = RedisCircuitBreaker(redis, FAST)
+    assert await breaker.state(provider) == "closed"
+    await breaker.set_forced_down(provider, True)
+    assert await breaker.state(provider) == "forced_down"
+    assert not await breaker.allow(provider)
+    assert await breaker.is_open(provider)
+    await breaker.set_forced_down(provider, False)
+    assert await breaker.state(provider) == "closed"
+    assert await breaker.allow(provider)

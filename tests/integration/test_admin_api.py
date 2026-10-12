@@ -23,6 +23,8 @@ async def client() -> AsyncIterator[httpx.AsyncClient]:
         admin_token=SecretStr("test-admin-token"),
         # Not testing routing here: skip loading the embedding model (~20 s, CPU-heavy).
         router_model_path="does-not-exist.json",
+        demo_enabled=True,
+        demo_keys_per_hour=1000,
     )
 
     async def factory() -> Container:
@@ -95,3 +97,28 @@ async def test_usage_aggregates(client: httpx.AsyncClient) -> None:
         assert {"key_id", "alias", "requests", "cost_usd", "p95_latency_ms", "cache_hits"} <= set(
             row
         )
+
+
+async def test_dashboard_feeds(client: httpx.AsyncClient) -> None:
+    series = await client.get("/admin/usage/timeseries?hours=24&bucket=hour", headers=ADMIN)
+    assert series.status_code == 200
+    assert series.json()["bucket"] == "hour"
+    for row in series.json()["rows"]:
+        assert {"bucket", "requests", "errors", "cost_usd", "p95_latency_ms"} <= set(row)
+    recent = await client.get("/admin/requests?limit=5", headers=ADMIN)
+    assert recent.status_code == 200
+    assert len(recent.json()["rows"]) <= 5
+    providers = await client.get("/admin/providers", headers=ADMIN)
+    assert {p["name"] for p in providers.json()} >= {"groq", "gemini", "openrouter"}
+
+
+async def test_demo_key_is_capped_and_scoped(client: httpx.AsyncClient) -> None:
+    created = await client.post("/demo/keys")
+    assert created.status_code == 201
+    body = created.json()
+    assert body["key"].startswith("gw-") and body["name"].startswith("demo-")
+    assert body["monthly_spend_cap_usd"] == "0.02" and body["rpm_limit"] == 10
+    assert "auto" in body["allowed_models"]
+    listed = (await client.get("/admin/keys", headers=ADMIN)).json()
+    mine = next(k for k in listed if k["name"] == body["name"])
+    assert mine["monthly_spend_cap_usd"] == "0.020000"
