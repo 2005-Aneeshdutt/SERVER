@@ -554,6 +554,21 @@ td .badge:first-child {
   margin: 8px 0 0;
 }
 
+.warn-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--warn-soft);
+  color: var(--text);
+  border: 1px solid color-mix(in srgb, var(--warn) 30%, transparent);
+  font-size: 13px;
+}
+
 .error-box {
   border-radius: 8px;
   background: var(--bad-soft);

@@ -1,5 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
-import { ApiError, chat, createDemoKey, listModels, type ChatResult, type ModelInfo } from "../api";
+import {
+  ApiError,
+  chat,
+  createDemoKey,
+  listModels,
+  type ChatResult,
+  type Message,
+  type ModelInfo,
+} from "../api";
 import { ms, usd } from "../format";
 import { useStored } from "../hooks";
 import { Markdown } from "./Markdown";
@@ -18,7 +26,25 @@ interface Run extends ChatResult {
   id: number;
   requested: string; // model the user picked (e.g. "auto"); ChatResult.model is upstream
   prompt: string;
+  messages: Message[]; // what was sent, so "Continue" can resume the conversation
 }
+
+/** A visible system message: tells the model its budget so it plans a complete answer. */
+function conciseInstruction(maxTokens: number): Message {
+  // ~0.75 words per token, halved again for headroom (and for reasoning models' thinking).
+  const words = Math.max(40, Math.floor(maxTokens * 0.5));
+  return {
+    role: "system",
+    content:
+      `Your whole reply must fit in about ${words} words. Plan for that budget: be concise, ` +
+      "prefer short explanations and compact code, and always end with a complete sentence.",
+  };
+}
+
+const CONTINUE: Message = {
+  role: "user",
+  content: "Continue exactly where you stopped. Do not repeat anything you already wrote.",
+};
 
 export function Playground() {
   const [key, setKey] = useStored("gw.key", "");
@@ -27,7 +53,8 @@ export function Playground() {
   const [prompt, setPrompt] = useState(EXAMPLES[0]!.prompt);
   const [stream, setStream] = useState(true);
   const [deterministic, setDeterministic] = useState(true);
-  const [maxTokens, setMaxTokens] = useState(512);
+  const [maxTokens, setMaxTokens] = useState(1024);
+  const [concise, setConcise] = useState(true);
   const [down, setDown] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -65,16 +92,66 @@ export function Playground() {
 
   async function send() {
     if (!key || !prompt.trim() || busy) return;
+    const messages: Message[] = [
+      ...(concise ? [conciseInstruction(maxTokens)] : []),
+      { role: "user", content: prompt },
+    ];
     setBusy(true);
     setLive({ text: "", reasoning: "" });
     try {
       const result = await chat(
-        { key, model, prompt, stream, deterministic, maxTokens, simulateOutage: down },
+        {
+          key,
+          model,
+          messages,
+          stream,
+          deterministic,
+          maxTokens,
+          simulateOutage: down,
+          reasoningEffort: concise ? "low" : undefined,
+        },
         (text, reasoning) => setLive({ text, reasoning }),
       );
       setRuns((prev) =>
-        [{ ...result, id: Date.now(), requested: model, prompt }, ...prev].slice(0, 8),
+        [{ ...result, id: Date.now(), requested: model, prompt, messages }, ...prev].slice(0, 8),
       );
+    } catch (e) {
+      setNotice(String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /** Resume an answer that hit max_tokens: send it back as context and append the rest. */
+  async function continueRun(run: Run) {
+    if (!key || busy) return;
+    const messages: Message[] = [
+      ...run.messages,
+      { role: "assistant", content: run.text },
+      CONTINUE,
+    ];
+    setBusy(true);
+    setLive({ text: run.text, reasoning: run.reasoning });
+    try {
+      const more = await chat(
+        { key, model: run.requested, messages, stream, deterministic, maxTokens, simulateOutage: down },
+        (text, reasoning) => setLive({ text: run.text + text, reasoning: run.reasoning + reasoning }),
+      );
+      const merged: Run = {
+        ...run,
+        ok: more.ok,
+        status: more.status,
+        error: more.error,
+        text: run.text + more.text,
+        reasoning: run.reasoning + more.reasoning,
+        finishReason: more.finishReason,
+        totalMs: run.totalMs + more.totalMs,
+        costUsd: (run.costUsd ?? 0) + (more.costUsd ?? 0),
+        completionTokens: (run.completionTokens ?? 0) + (more.completionTokens ?? 0),
+        attempts: run.attempts + more.attempts,
+        messages: [...messages, { role: "assistant", content: more.text }],
+      };
+      setRuns((prev) => prev.map((r) => (r.id === run.id ? merged : r)));
     } catch (e) {
       setNotice(String(e));
     } finally {
@@ -152,6 +229,13 @@ export function Playground() {
             />
             Cacheable (temperature 0)
           </label>
+          <label
+            className="toggle"
+            title="Adds a visible system message telling the model its length budget"
+          >
+            <input type="checkbox" checked={concise} onChange={(e) => setConcise(e.target.checked)} />
+            Concise (fit the limit)
+          </label>
           <label className="toggle">
             Max tokens
             <input
@@ -194,7 +278,7 @@ export function Playground() {
       </section>
 
       <section className="panel result">
-        <ResultView live={live} busy={busy} run={last} />
+        <ResultView live={live} busy={busy} run={last} onContinue={continueRun} />
         {runs.length > 1 && <History runs={runs.slice(1)} />}
       </section>
     </div>
@@ -205,10 +289,12 @@ function ResultView({
   live,
   busy,
   run,
+  onContinue,
 }: {
   live: { text: string; reasoning: string };
   busy: boolean;
   run: Run | undefined;
+  onContinue: (run: Run) => void;
 }) {
   const text = busy ? live.text : (run?.text ?? "");
   const reasoning = busy ? live.reasoning : (run?.reasoning ?? "");
@@ -236,6 +322,17 @@ function ResultView({
       <div className={`answer ${busy ? "streaming" : ""}`}>
         {text ? <Markdown text={text} /> : busy ? "…" : ""}
       </div>
+      {run && !busy && run.finishReason === "length" && (
+        <div className="warn-box">
+          <span>
+            The answer was cut off at the <strong>max tokens</strong> limit. Continue it, or raise
+            Max tokens / turn on Concise and send again.
+          </span>
+          <button className="secondary" onClick={() => onContinue(run)}>
+            Continue
+          </button>
+        </div>
+      )}
     </>
   );
 }
@@ -285,6 +382,9 @@ function Meta({ run }: { run: Run }) {
       </Tile>
       <Tile label="Status">
         <span className={`badge ${run.ok ? "badge-green" : "badge-red"}`}>{run.status}</span>
+        {run.finishReason && (
+          <small>{run.finishReason === "length" ? "cut off (max tokens)" : run.finishReason}</small>
+        )}
       </Tile>
     </div>
   );
