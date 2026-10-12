@@ -88,7 +88,10 @@ services:
     image: redis:7-alpine
     # AOF persistence: spend totals and reservations survive a Redis restart (Postgres can
     # rebuild settled spend anyway, but in-flight reservations live only here).
-    command: ["redis-server", "--appendonly", "yes", "--appendfsync", "everysec"]
+    # noeviction: the response cache shares this Redis, and an LRU policy could evict spend
+    # reservations under memory pressure (silent overspend). Full memory must fail loudly:
+    # cache writes fail open, limiters fail closed.
+    command: ["redis-server", "--appendonly", "yes", "--appendfsync", "everysec", "--maxmemory-policy", "noeviction"]
     volumes:
       - redisdata:/data
     ports:
