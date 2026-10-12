@@ -53,6 +53,7 @@ class Container:
     admin_keys: SqlKeyStore | None = None  # None in unit tests (admin API then 503s)
     usage_reader: SqlUsageReader | None = None
     router: SmartRouter | None = None  # model="auto"; None if the router isn't installed
+    redis: Redis | None = None  # shared state for small counters (demo-key quota)
     # name -> coroutine that raises if the dependency is unhealthy (used by /readyz)
     readiness: dict[str, ReadinessCheck] = field(default_factory=dict)
     closers: list[Callable[[], Awaitable[None]]] = field(default_factory=list)
@@ -130,6 +131,7 @@ async def build_container(settings: Settings) -> Container:
         admin_keys=key_store,
         usage_reader=SqlUsageReader(sessions, replica_sessions),
         router=router,
+        redis=redis,
         readiness={
             "redis": _redis_check(redis),
             "postgres": _postgres_check(engine),
