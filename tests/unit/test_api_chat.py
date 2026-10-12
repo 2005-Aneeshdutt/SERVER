@@ -16,7 +16,7 @@ from tests.helpers import (
     sse_response,
 )
 
-BODY = {"model": "groq-llama-8b", "messages": [{"role": "user", "content": "Hi"}]}
+BODY = {"model": "groq-gpt-oss-20b", "messages": [{"role": "user", "content": "Hi"}]}
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 
@@ -70,7 +70,7 @@ async def test_model_outside_allowlist_is_403(gateway: Gateway) -> None:
 
 async def test_invalid_body_is_400_in_openai_format(gateway: Gateway) -> None:
     response = await gateway.client.post(
-        "/v1/chat/completions", json={"model": "groq-llama-8b", "messages": []}
+        "/v1/chat/completions", json={"model": "groq-gpt-oss-20b", "messages": []}
     )
     assert response.status_code == 400
     error = response.json()["error"]
@@ -79,7 +79,7 @@ async def test_invalid_body_is_400_in_openai_format(gateway: Gateway) -> None:
 
 async def test_models_endpoint_lists_configured_allowed_aliases(gateway: Gateway) -> None:
     ids = {m["id"] for m in (await gateway.client.get("/v1/models")).json()["data"]}
-    assert {"groq-llama-8b", "gemini-flash", "claude-haiku", "gpt-4o-mini"} <= ids
+    assert {"groq-gpt-oss-20b", "gemini-flash", "claude-haiku", "gpt-4o-mini"} <= ids
 
     gateway.keys.records[hash_key("gw-limited")] = key_record(allowed=frozenset({"gemini-flash"}))
     limited = await gateway.client.get("/v1/models", headers={"Authorization": "Bearer gw-limited"})
@@ -103,14 +103,14 @@ async def test_completion_proxies_and_logs_cost(gateway: Gateway, upstream: resp
     assert response.status_code == 200
     assert response.json()["choices"][0]["message"]["content"] == "Hello!"
     assert response.headers["x-gateway-provider"] == "groq"
-    assert response.headers["x-gateway-model"] == "llama-3.1-8b-instant"
-    # 1000 * $0.05/M + 500 * $0.08/M = $0.00009
-    assert Decimal(response.headers["x-gateway-cost-usd"]) == Decimal("0.00009")
+    assert response.headers["x-gateway-model"] == "openai/gpt-oss-20b"
+    # 1000 * $0.075/M + 500 * $0.30/M = $0.000225
+    assert Decimal(response.headers["x-gateway-cost-usd"]) == Decimal("0.000225")
 
     [record] = await gateway.logged()
     assert record.status == "ok" and record.key_id == gateway.key.id
     assert (record.prompt_tokens, record.completion_tokens) == (1000, 500)
-    assert record.cost_usd == Decimal("0.00009") and not record.usage_estimated
+    assert record.cost_usd == Decimal("0.000225") and not record.usage_estimated
     assert str(record.id) == response.headers["x-gateway-request-id"]
     timing = dict(
         part.strip().split(";dur=") for part in response.headers["server-timing"].split(",")
@@ -257,7 +257,7 @@ async def test_client_disconnect_is_logged_and_upstream_closed(gateway: Gateway)
         finally:
             closed = True
 
-    spec = gateway.container.registry.get("groq-llama-8b")
+    spec = gateway.container.registry.get("groq-gpt-oss-20b")
     call = CallContext(
         uuid.uuid4(),
         gateway.key,
@@ -303,7 +303,7 @@ async def test_failover_to_next_alias_after_retries(
     assert response.headers["x-gateway-attempts"] == "3"
     [record] = await gateway.logged()
     assert (record.alias, record.provider, record.fallback_count) == (
-        "groq-llama-8b",
+        "groq-gpt-oss-20b",
         "openrouter",
         1,
     )

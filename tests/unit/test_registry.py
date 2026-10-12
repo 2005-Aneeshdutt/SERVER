@@ -10,9 +10,9 @@ from tests.helpers import spec
 
 def test_loads_repo_models_yaml_with_exact_decimal_prices() -> None:
     registry = ModelRegistry.from_yaml(ROOT / "models.yaml")
-    groq = registry.get("groq-llama-8b")
+    groq = registry.get("groq-gpt-oss-20b")
     assert groq.provider == "groq"
-    assert groq.input_price_per_mtok == Decimal("0.05")
+    assert groq.input_price_per_mtok == Decimal("0.075")
     assert isinstance(groq.input_price_per_mtok, Decimal)
 
 

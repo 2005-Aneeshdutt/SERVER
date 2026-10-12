@@ -25,7 +25,10 @@ from tests.helpers import (
     sse_response,
 )
 
-BODY: dict[str, Any] = {"model": "groq-llama-8b", "messages": [{"role": "user", "content": "Hi"}]}
+BODY: dict[str, Any] = {
+    "model": "groq-gpt-oss-20b",
+    "messages": [{"role": "user", "content": "Hi"}],
+}
 CACHED = {**BODY, "temperature": 0}
 
 
@@ -109,7 +112,7 @@ async def test_reservation_is_worst_case_and_settled_with_actual_cost(
     # No max_tokens from the client -> the gateway caps output so the reservation is an upper bound.
     assert json.loads(route.calls.last.request.content)["max_tokens"] == 1024
     [(_, actual)] = gateway.spend.settled
-    assert actual == Decimal("0.00009")  # 1000 * $0.05/M + 500 * $0.08/M
+    assert actual == Decimal("0.000225")  # 1000 * $0.075/M + 500 * $0.30/M
     assert gateway.spend.reserved == {}
 
 
@@ -130,7 +133,7 @@ async def test_reservation_covers_the_most_expensive_fallback(
     await gateway.client.post(
         "/v1/chat/completions", json={**BODY, "max_tokens": 1_000_000}, headers=headers
     )
-    # groq-llama-8b ($0.08/M out) falls back to gemini-flash-lite ($1.50/M out): reserve for that
+    # groq-gpt-oss-20b ($0.08/M out) falls back to gemini-flash-lite ($1.50/M out): reserve for that
     assert reserved and reserved[0] >= Decimal("1.5")
 
 

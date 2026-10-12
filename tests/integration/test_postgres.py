@@ -34,7 +34,7 @@ async def test_key_roundtrip_stores_only_the_hash(
         f"it-{uuid.uuid4().hex[:6]}",
         rpm_limit=60,
         monthly_spend_cap_usd=Decimal("1.50"),
-        allowed_models=["groq-llama-8b"],
+        allowed_models=["groq-gpt-oss-20b"],
     )
     try:
         found = await store.get_by_hash(hash_key(raw))
@@ -54,7 +54,7 @@ async def test_request_log_batch_insert(sessions: async_sessionmaker[AsyncSessio
         RequestRecord(
             id=i,
             key_id=None,
-            alias="groq-llama-8b",
+            alias="groq-gpt-oss-20b",
             provider="groq",
             upstream_model="llama",
             stream=True,

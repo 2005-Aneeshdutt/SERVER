@@ -57,7 +57,7 @@ def mocked(upstream: respx.Router) -> respx.Router:
 
 @pytest.mark.parametrize(
     ("alias", "expected"),
-    [("groq-llama-8b", "Hello from Groq"), ("gemini-flash", "Hello from Gemini")],
+    [("groq-gpt-oss-20b", "Hello from Groq"), ("gemini-flash", "Hello from Gemini")],
 )
 async def test_sdk_non_streaming(
     sdk: openai.AsyncOpenAI, mocked: respx.Router, alias: str, expected: str
@@ -71,7 +71,7 @@ async def test_sdk_non_streaming(
 
 @pytest.mark.parametrize(
     ("alias", "expected"),
-    [("groq-llama-8b", "Hello from Groq"), ("gemini-flash", "Hello from Gemini")],
+    [("groq-gpt-oss-20b", "Hello from Groq"), ("gemini-flash", "Hello from Gemini")],
 )
 async def test_sdk_streaming(
     sdk: openai.AsyncOpenAI, mocked: respx.Router, alias: str, expected: str
@@ -104,7 +104,7 @@ async def test_sdk_surfaces_gateway_errors_as_typed_exceptions(
     )
     with pytest.raises(openai.AuthenticationError):
         await bad.chat.completions.create(
-            model="groq-llama-8b", messages=[{"role": "user", "content": "Hi"}]
+            model="groq-gpt-oss-20b", messages=[{"role": "user", "content": "Hi"}]
         )
 
 
@@ -114,7 +114,7 @@ async def test_sdk_raises_on_mid_stream_error(
     events = [*openai_chunks(["partial"], usage=False)[:2], {"error": {"message": "boom"}}]
     upstream.post(GROQ_URL).mock(return_value=sse_response(events))
     stream = await sdk.chat.completions.create(
-        model="groq-llama-8b", messages=[{"role": "user", "content": "Hi"}], stream=True
+        model="groq-gpt-oss-20b", messages=[{"role": "user", "content": "Hi"}], stream=True
     )
     with pytest.raises(openai.APIError):
         async for _ in stream:

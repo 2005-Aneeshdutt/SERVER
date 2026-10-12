@@ -46,7 +46,7 @@ def openai_completion(
         "id": "chatcmpl-abc",
         "object": "chat.completion",
         "created": 1700000000,
-        "model": "llama-3.1-8b-instant",
+        "model": "openai/gpt-oss-20b",
         "choices": [
             {
                 "index": 0,

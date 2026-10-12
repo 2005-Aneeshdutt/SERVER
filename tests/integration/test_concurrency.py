@@ -21,7 +21,7 @@ pytestmark = pytest.mark.integration
 T = TypeVar("T")
 
 BODY = {
-    "model": "groq-llama-8b",
+    "model": "groq-gpt-oss-20b",
     "messages": [{"role": "user", "content": "Hi"}],
     "max_tokens": 100,
 }
