@@ -187,8 +187,69 @@ def _usd(value: Decimal | None) -> str:
 
 def _format_row(row: dict[str, Any]) -> dict[str, Any]:
     out = dict(row)
-    out["cost_usd"] = _usd(row["cost_usd"])
+    if "cost_usd" in out:
+        out["cost_usd"] = _usd(row["cost_usd"])
     for name in ("avg_latency_ms", "p50_latency_ms", "p95_latency_ms", "avg_ttft_ms"):
         if out.get(name) is not None:
             out[name] = round(float(out[name]), 1)
     return out
+
+
+# ---- providers: status and the kill switch ------------------------------------------------
+
+
+class OutageRequest(BaseModel):
+    down: bool
+
+
+@router.get("/providers")
+async def list_providers(container: ContainerDep) -> list[dict[str, Any]]:
+    """Every provider in the registry, whether it's configured, and its circuit state."""
+    by_provider: dict[str, list[str]] = {}
+    for spec in container.registry.all():
+        by_provider.setdefault(spec.provider, []).append(spec.alias)
+    out = []
+    for name, aliases in sorted(by_provider.items()):
+        configured = name in container.providers
+        state = await container.breaker.state(name) if configured else "not_configured"
+        out.append({"name": name, "configured": configured, "state": state, "aliases": aliases})
+    return out
+
+
+@router.post("/providers/{name}/outage")
+async def set_outage(name: str, body: OutageRequest, container: ContainerDep) -> dict[str, Any]:
+    """Take a provider down for ALL traffic (or bring it back). Requests fail over to the next
+    alias in their chain, exactly as in a real outage."""
+    if name not in container.providers:
+        raise NotFound(f"No configured provider named {name!r}")
+    await container.breaker.set_forced_down(name, body.down)
+    return {"name": name, "state": await container.breaker.state(name)}
+
+
+# ---- dashboard feeds ------------------------------------------------------------------------
+
+
+@router.get("/usage/timeseries")
+async def usage_timeseries(
+    container: ContainerDep,
+    hours: Annotated[int, Query(ge=1, le=168)] = 24,
+    bucket: Literal["minute", "hour"] = "hour",
+) -> dict[str, Any]:
+    end = datetime.now(UTC)
+    rows, source, lag_s = await _usage_reader(container).timeseries(
+        end - timedelta(hours=hours), end, bucket
+    )
+    return {
+        "bucket": bucket,
+        "source": source,
+        "replica_lag_s": lag_s,
+        "rows": [_format_row(r) for r in rows],
+    }
+
+
+@router.get("/requests")
+async def recent_requests(
+    container: ContainerDep, limit: Annotated[int, Query(ge=1, le=200)] = 50
+) -> dict[str, Any]:
+    rows, source, lag_s = await _usage_reader(container).recent(limit)
+    return {"source": source, "replica_lag_s": lag_s, "rows": [_format_row(r) for r in rows]}
