@@ -59,6 +59,7 @@ from gateway.routing.smart import AUTO, RouteDecision
 
 log = logging.getLogger(__name__)
 router = APIRouter()
+SIMULATE_OUTAGE_HEADER = "x-gateway-simulate-outage"
 
 _INTERNAL_ERROR_BODY = {
     "error": {
@@ -122,7 +123,7 @@ async def chat_completions(
         request_id=uuid.uuid4(),
         key=key,
         requested_alias=body.model,
-        trace=DispatchTrace(spec=spec),
+        trace=DispatchTrace(spec=spec, simulated_down=_simulated_outage(request)),
         stream=body.stream,
         started=time.perf_counter(),
         created_at=datetime.now(UTC),
@@ -132,6 +133,12 @@ async def chat_completions(
     except Exception as exc:
         await _finish(container, call, _failure(exc))
         raise
+
+
+def _simulated_outage(request: Request) -> frozenset[str]:
+    """`X-Gateway-Simulate-Outage: groq,gemini` -> providers to skip for this request only."""
+    raw = request.headers.get(SIMULATE_OUTAGE_HEADER, "")
+    return frozenset(p.strip().lower() for p in raw.split(",") if p.strip())
 
 
 async def _handle(
@@ -319,7 +326,11 @@ async def _sse_events(
         if body.wants_usage_in_stream():
             usage, _ = _stream_usage(acc, body)
             final = acc.usage_chunk(usage, _fallback_id(call), call.trace.spec.upstream_model)
-            yield sse_json(final.model_dump(mode="json", exclude_none=True))
+            payload = final.model_dump(mode="json", exclude_none=True)
+            # Cost isn't known when stream headers go out; report it with the final usage.
+            # Extra top-level fields are ignored by OpenAI SDKs.
+            payload["x_gateway"] = {"cost_usd": format(_cost(call, usage), ".10f")}
+            yield sse_json(payload)
         yield DONE_EVENT
         status = "ok"
     except Exception as exc:
@@ -341,6 +352,12 @@ async def _sse_events(
             response = acc.to_response(usage, _fallback_id(call), call.trace.spec.upstream_model)
         outcome = Outcome(status, usage, estimated, error_type, acc.ttft_ms, response)
         await _finish(container, call, outcome)
+
+
+def _cost(call: CallContext, usage: Usage) -> Decimal:
+    if call.guards.cache_status == "HIT":
+        return Decimal(0)
+    return call.trace.spec.cost_usd(usage.prompt_tokens, usage.completion_tokens)
 
 
 def _stream_usage(acc: StreamAccumulator, body: ChatRequest) -> tuple[Usage, bool]:
