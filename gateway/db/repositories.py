@@ -151,14 +151,78 @@ class SqlUsageReader:
         self, start: datetime, end: datetime, key_id: uuid.UUID | None = None
     ) -> tuple[list[dict[str, Any]], str, float | None]:
         """(rows, source, replica_lag_s). source is "replica" or "primary"."""
+        query = self._usage_query(start, end, key_id)
+        return await self._read(query)
+
+    async def timeseries(
+        self, start: datetime, end: datetime, bucket: str
+    ) -> tuple[list[dict[str, Any]], str, float | None]:
+        """Requests, errors, cache hits, cost and latency per minute/hour bucket."""
+        r = RequestRow
+        slot = func.date_trunc(bucket, r.created_at).label("bucket")
+        query = (
+            select(
+                slot,
+                func.count().label("requests"),
+                func.count().filter(r.status == "error").label("errors"),
+                func.count().filter(r.cache_hit).label("cache_hits"),
+                func.coalesce(func.sum(r.cost_usd), 0).label("cost_usd"),
+                func.percentile_cont(0.5).within_group(r.latency_ms).label("p50_latency_ms"),
+                func.percentile_cont(0.95).within_group(r.latency_ms).label("p95_latency_ms"),
+            )
+            .where(r.created_at >= start, r.created_at < end)
+            .group_by(slot)
+            .order_by(slot)
+        )
+        return await self._read(query)
+
+    async def recent(self, limit: int) -> tuple[list[dict[str, Any]], str, float | None]:
+        """Latest requests with the key's name, newest first."""
+        r = RequestRow
+        query = (
+            select(
+                r.id,
+                r.created_at,
+                ApiKeyRow.name.label("key_name"),
+                r.alias,
+                r.provider,
+                r.upstream_model,
+                r.status,
+                r.error_type,
+                r.latency_ms,
+                r.time_to_first_token_ms,
+                r.cost_usd,
+                r.cache_hit,
+                r.fallback_count,
+                r.route,
+                r.route_probability,
+                r.prompt_tokens,
+                r.completion_tokens,
+            )
+            .outerjoin(ApiKeyRow, ApiKeyRow.id == r.key_id)
+            .order_by(r.created_at.desc())
+            .limit(limit)
+        )
+        return await self._read(query)
+
+    async def _read(self, query: Any) -> tuple[list[dict[str, Any]], str, float | None]:
+        """Run on the replica if there is one; on the primary if not, or if it's down."""
         if self._replica is not None:
             try:
-                rows = await self._query(self._replica, start, end, key_id)
+                rows = await self._fetch(self._replica, query)
                 return rows, "replica", await self._replica_lag_s()
             except _UNREACHABLE:
                 REPLICA_FALLBACKS.inc()
-                log.warning("read replica unavailable; usage query falls back to primary")
-        return await self._query(self._primary, start, end, key_id), "primary", None
+                log.warning("read replica unavailable; dashboard query falls back to primary")
+        return await self._fetch(self._primary, query), "primary", None
+
+    @staticmethod
+    async def _fetch(
+        sessions: async_sessionmaker[AsyncSession], query: Any
+    ) -> list[dict[str, Any]]:
+        async with sessions() as session:
+            rows = (await session.execute(query)).mappings().all()
+        return [dict(row) for row in rows]
 
     async def _replica_lag_s(self) -> float | None:
         """Seconds since the last replayed transaction. Overstates lag when the primary is idle
@@ -172,13 +236,8 @@ class SqlUsageReader:
             return None
         return round(float(lag), 3) if lag is not None else None
 
-    async def _query(
-        self,
-        sessions: async_sessionmaker[AsyncSession],
-        start: datetime,
-        end: datetime,
-        key_id: uuid.UUID | None,
-    ) -> list[dict[str, Any]]:
+    @staticmethod
+    def _usage_query(start: datetime, end: datetime, key_id: uuid.UUID | None) -> Any:
         r = RequestRow
         query = (
             select(
@@ -202,6 +261,4 @@ class SqlUsageReader:
         )
         if key_id is not None:
             query = query.where(r.key_id == key_id)
-        async with sessions() as session:
-            rows = (await session.execute(query)).mappings().all()
-        return [dict(row) for row in rows]
+        return query
