@@ -176,6 +176,23 @@ class SqlUsageReader:
         )
         return await self._read(query)
 
+    async def summary(
+        self, start: datetime, end: datetime
+    ) -> tuple[list[dict[str, Any]], str, float | None]:
+        """One row of totals for the window (percentiles over all requests, not per bucket)."""
+        r = RequestRow
+        query = select(
+            func.count().label("requests"),
+            func.count().filter(r.status == "error").label("errors"),
+            func.count().filter(r.cache_hit).label("cache_hits"),
+            func.coalesce(func.sum(r.cost_usd), 0).label("cost_usd"),
+            func.coalesce(func.sum(r.prompt_tokens + r.completion_tokens), 0).label("tokens"),
+            func.percentile_cont(0.5).within_group(r.latency_ms).label("p50_latency_ms"),
+            func.percentile_cont(0.95).within_group(r.latency_ms).label("p95_latency_ms"),
+            func.count().filter(r.fallback_count > 0).label("fallbacks"),
+        ).where(r.created_at >= start, r.created_at < end)
+        return await self._read(query)
+
     async def recent(self, limit: int) -> tuple[list[dict[str, Any]], str, float | None]:
         """Latest requests with the key's name, newest first."""
         r = RequestRow

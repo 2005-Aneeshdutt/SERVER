@@ -236,10 +236,14 @@ async def usage_timeseries(
     bucket: Literal["minute", "hour"] = "hour",
 ) -> dict[str, Any]:
     end = datetime.now(UTC)
-    rows, source, lag_s = await _usage_reader(container).timeseries(
-        end - timedelta(hours=hours), end, bucket
-    )
+    start = end - timedelta(hours=hours)
+    reader = _usage_reader(container)
+    rows, source, lag_s = await reader.timeseries(start, end, bucket)
+    totals, _, _ = await reader.summary(start, end)
     return {
+        "since": start,
+        "until": end,
+        "totals": _format_row(totals[0]) if totals else {},
         "bucket": bucket,
         "source": source,
         "replica_lag_s": lag_s,
