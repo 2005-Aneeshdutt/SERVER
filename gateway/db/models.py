@@ -4,6 +4,7 @@ from decimal import Decimal
 
 from sqlalchemy import (
     ARRAY,
+    BigInteger,
     Boolean,
     DateTime,
     Float,
@@ -34,6 +35,8 @@ class ApiKeyRow(Base):
     allowed_models: Mapped[list[str] | None] = mapped_column(ARRAY(String(100)))
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     routing_quality: Mapped[str] = mapped_column(String(16), default="balanced")
+    distill_opt_in: Mapped[bool] = mapped_column(Boolean, default=False)
+    simulated: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -63,3 +66,37 @@ class RequestRow(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     route: Mapped[str | None] = mapped_column(String(16))
     route_probability: Mapped[float | None] = mapped_column(Float)
+
+
+class CaptureEventRow(Base):
+    """Metadata for one captured request (topic gateway.events.v1). Message content lives in
+    Parquet (`parquet_path`), not here, so this table stays small and fast to aggregate."""
+
+    __tablename__ = "capture_events"
+    __table_args__ = (
+        Index("ix_capture_events_ts", "ts"),
+        Index("ix_capture_events_system_fp", "system_fingerprint"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True)  # = request id; replays dedupe on it
+    ts: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    key_id: Mapped[uuid.UUID | None] = mapped_column()
+    simulated: Mapped[bool] = mapped_column(Boolean)
+    alias: Mapped[str] = mapped_column(String(100))
+    served_alias: Mapped[str] = mapped_column(String(100))
+    provider: Mapped[str] = mapped_column(String(50))
+    upstream_model: Mapped[str] = mapped_column(String(200))
+    system_fingerprint: Mapped[str | None] = mapped_column(String(32))
+    template_fingerprint: Mapped[str | None] = mapped_column(String(32))
+    content_captured: Mapped[bool] = mapped_column(Boolean)
+    status: Mapped[str] = mapped_column(String(32))
+    error_type: Mapped[str | None] = mapped_column(String(64))
+    prompt_tokens: Mapped[int] = mapped_column(Integer)
+    completion_tokens: Mapped[int] = mapped_column(Integer)
+    cost_usd: Mapped[Decimal] = mapped_column(Numeric(18, 10))
+    latency_ms: Mapped[int] = mapped_column(Integer)
+    cache_hit: Mapped[bool] = mapped_column(Boolean)
+    pii_redactions: Mapped[int] = mapped_column(Integer)
+    parquet_path: Mapped[str | None] = mapped_column(String(500))
+    kafka_partition: Mapped[int] = mapped_column(Integer)
+    kafka_offset: Mapped[int] = mapped_column(BigInteger)

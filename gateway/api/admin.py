@@ -43,6 +43,8 @@ class KeyCreate(BaseModel):
     monthly_spend_cap_usd: Decimal | None = Field(default=None, ge=0, decimal_places=6)
     allowed_models: list[str] | None = None
     routing_quality: RoutingQuality = "balanced"
+    distill_opt_in: bool = False  # capture PII-scrubbed prompts/responses for distillation
+    simulated: bool = False  # traffic from this key is labelled simulated everywhere
 
 
 class KeyUpdate(BaseModel):
@@ -55,6 +57,8 @@ class KeyUpdate(BaseModel):
     allowed_models: list[str] | None = None
     active: bool | None = None
     routing_quality: RoutingQuality | None = None
+    distill_opt_in: bool | None = None
+    simulated: bool | None = None
 
 
 class KeyOut(BaseModel):
@@ -67,6 +71,8 @@ class KeyOut(BaseModel):
     allowed_models: list[str] | None
     active: bool
     routing_quality: str
+    distill_opt_in: bool
+    simulated: bool
     created_at: datetime | None
 
     @classmethod
@@ -81,6 +87,8 @@ class KeyOut(BaseModel):
             allowed_models=row.allowed_models,
             active=row.active,
             routing_quality=row.routing_quality,
+            distill_opt_in=row.distill_opt_in,
+            simulated=row.simulated,
             created_at=row.created_at,
         )
 
@@ -121,6 +129,8 @@ async def create_key(body: KeyCreate, container: ContainerDep, store: StoreDep) 
         monthly_spend_cap_usd=body.monthly_spend_cap_usd,
         allowed_models=body.allowed_models,
         routing_quality=body.routing_quality,
+        distill_opt_in=body.distill_opt_in,
+        simulated=body.simulated,
     )
     row = await store.get_row(record.id)
     assert row is not None
@@ -139,7 +149,7 @@ async def update_key(
     changes = body.model_dump(include=body.model_fields_set)
     if changes.get("name") is None:
         changes.pop("name", None)
-    for non_nullable in ("active", "routing_quality"):
+    for non_nullable in ("active", "routing_quality", "distill_opt_in", "simulated"):
         if changes.get(non_nullable) is None:
             changes.pop(non_nullable, None)
     _check_aliases(container, changes.get("allowed_models"))

@@ -30,6 +30,10 @@ class ApiKeyRecord:
     active: bool
     # model="auto": "low" saves the most, "high" sends more traffic to the strong model.
     routing_quality: str = "balanced"
+    # Distillation (default off): may this key's prompts/responses be captured for training
+    # (PII-scrubbed)? Is its traffic simulated (replayer, load tests)? See PLAN.md.
+    distill_opt_in: bool = False
+    simulated: bool = False
 
     def may_use(self, alias: str) -> bool:
         return self.allowed_models is None or alias in self.allowed_models
