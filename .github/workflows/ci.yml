@@ -13,7 +13,9 @@ jobs:
       - uses: astral-sh/setup-uv@v6
         with:
           python-version: "3.12"
-      - run: uv sync --frozen
+      # Same extras as the integration job: pytest imports every test module (even deselected
+      # integration ones), and mypy should check distill/ against the real libraries.
+      - run: uv sync --frozen --extra capture --group distill
       - name: ruff
         run: uv run ruff check . && uv run ruff format --check .
       - name: mypy
