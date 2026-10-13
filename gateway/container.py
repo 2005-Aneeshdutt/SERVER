@@ -14,6 +14,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from gateway.cache.response_cache import RedisResponseCache, ResponseCache
+from gateway.capture.producer import CaptureProducer
 from gateway.core import tokens
 from gateway.core.auth import CachedKeyStore, KeyStore
 from gateway.core.config import Settings
@@ -54,6 +55,7 @@ class Container:
     usage_reader: SqlUsageReader | None = None
     router: SmartRouter | None = None  # model="auto"; None if the router isn't installed
     redis: Redis | None = None  # shared state for small counters (demo-key quota)
+    capture: CaptureProducer | None = None  # distillation capture; None unless enabled
     # name -> coroutine that raises if the dependency is unhealthy (used by /readyz)
     readiness: dict[str, ReadinessCheck] = field(default_factory=dict)
     closers: list[Callable[[], Awaitable[None]]] = field(default_factory=list)
@@ -133,6 +135,7 @@ async def build_container(settings: Settings) -> Container:
         usage_reader=SqlUsageReader(sessions, replica_sessions),
         router=router,
         redis=redis,
+        capture=_capture(settings),
         readiness={
             "redis": _redis_check(redis),
             "postgres": _postgres_check(engine),
@@ -146,6 +149,16 @@ async def build_container(settings: Settings) -> Container:
             *([replica_engine.dispose] if replica_engine else []),
             *([_closer(router.close)] if router else []),
         ],
+    )
+
+
+def _capture(settings: Settings) -> CaptureProducer | None:
+    if not settings.capture_enabled:
+        return None
+    from gateway.capture.kafka import KafkaSender  # needs the `capture` extra
+
+    return CaptureProducer(
+        KafkaSender(settings.kafka_bootstrap), settings.capture_topic, settings.capture_queue_size
     )
 
 

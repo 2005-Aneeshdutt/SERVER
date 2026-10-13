@@ -29,6 +29,7 @@ from gateway.cache.response_cache import (
     lookup_or_lead,
     replay_chunks,
 )
+from gateway.capture.events import CaptureItem
 from gateway.container import Container
 from gateway.core import tokens
 from gateway.core.auth import ApiKeyRecord
@@ -60,6 +61,8 @@ from gateway.routing.smart import AUTO, RouteDecision
 log = logging.getLogger(__name__)
 router = APIRouter()
 SIMULATE_OUTAGE_HEADER = "x-gateway-simulate-outage"
+# Marks traffic as simulated (replayer, demos) in captured events, on top of the key's flag.
+SIMULATED_HEADER = "x-gateway-simulated"
 
 _INTERNAL_ERROR_BODY = {
     "error": {
@@ -94,6 +97,8 @@ class CallContext:
     stream: bool
     started: float
     created_at: datetime
+    body: ChatRequest
+    simulated: bool = False
     guards: Guards = field(default_factory=Guards)
 
 
@@ -127,6 +132,8 @@ async def chat_completions(
         stream=body.stream,
         started=time.perf_counter(),
         created_at=datetime.now(UTC),
+        body=body,
+        simulated=key.simulated or request.headers.get(SIMULATED_HEADER, "") in ("1", "true"),
     )
     try:
         return await _handle(container, body, call, request.headers.get(CACHE_HEADER))
@@ -238,7 +245,7 @@ async def _serve_cached(
             acc.add(chunk)
         acc.usage = usage
         return _streaming_response(container, body, call, chunks, _nothing(), acc)
-    await _finish(container, call, Outcome("ok", usage, False))
+    await _finish(container, call, Outcome("ok", usage, False, response=response))
     return _json(response, _headers(call, Decimal(0)))
 
 
@@ -348,7 +355,8 @@ async def _sse_events(
             await rest.aclose()
         usage, estimated = _stream_usage(acc, body)
         response = None
-        if status == "ok" and call.guards.lock_token is not None:
+        wants_response = call.guards.lock_token is not None or container.capture is not None
+        if status == "ok" and wants_response:
             response = acc.to_response(usage, _fallback_id(call), call.trace.spec.upstream_model)
         outcome = Outcome(status, usage, estimated, error_type, acc.ttft_ms, response)
         await _finish(container, call, outcome)
@@ -430,29 +438,39 @@ async def _finish(container: Container, call: CallContext, outcome: Outcome) -> 
         Decimal(0) if cache_hit else served.cost_usd(usage.prompt_tokens, usage.completion_tokens)
     )
     latency_s = time.perf_counter() - call.started
-    container.request_log.submit(
-        RequestRecord(
-            id=call.request_id,
-            key_id=call.key.id,
-            alias=call.requested_alias,
-            provider=served.provider,
-            upstream_model=served.upstream_model,
-            stream=call.stream,
-            prompt_tokens=usage.prompt_tokens,
-            completion_tokens=usage.completion_tokens,
-            usage_estimated=outcome.usage_estimated,
-            cost_usd=cost,
-            latency_ms=int(latency_s * 1000),
-            time_to_first_token_ms=outcome.ttft_ms,
-            cache_hit=cache_hit,
-            status=outcome.status,
-            error_type=outcome.error_type,
-            fallback_count=call.trace.fallback_count,
-            created_at=call.created_at,
-            route=guards.route.route if guards.route else None,
-            route_probability=guards.route.probability if guards.route else None,
-        )
+    record = RequestRecord(
+        id=call.request_id,
+        key_id=call.key.id,
+        alias=call.requested_alias,
+        provider=served.provider,
+        upstream_model=served.upstream_model,
+        stream=call.stream,
+        prompt_tokens=usage.prompt_tokens,
+        completion_tokens=usage.completion_tokens,
+        usage_estimated=outcome.usage_estimated,
+        cost_usd=cost,
+        latency_ms=int(latency_s * 1000),
+        time_to_first_token_ms=outcome.ttft_ms,
+        cache_hit=cache_hit,
+        status=outcome.status,
+        error_type=outcome.error_type,
+        fallback_count=call.trace.fallback_count,
+        created_at=call.created_at,
+        route=guards.route.route if guards.route else None,
+        route_probability=guards.route.probability if guards.route else None,
     )
+    container.request_log.submit(record)
+    if container.capture is not None:  # put_nowait only: scrubbing and Kafka run off the path
+        container.capture.submit(
+            CaptureItem(
+                record=record,
+                served_alias=served.alias,
+                body=call.body,
+                response=outcome.response,
+                opt_in=call.key.distill_opt_in,
+                simulated=call.simulated,
+            )
+        )
     _observe(call, outcome, latency_s)
     await _release(container, call, outcome, cost, latency_s)
     return cost

@@ -258,6 +258,7 @@ async def test_client_disconnect_is_logged_and_upstream_closed(gateway: Gateway)
             closed = True
 
     spec = gateway.container.registry.get("groq-gpt-oss-20b")
+    body = ChatRequest.model_validate({**BODY, "stream": True})
     call = CallContext(
         uuid.uuid4(),
         gateway.key,
@@ -266,8 +267,8 @@ async def test_client_disconnect_is_logged_and_upstream_closed(gateway: Gateway)
         True,
         time.perf_counter(),
         datetime.now(UTC),
+        body,
     )
-    body = ChatRequest.model_validate({**BODY, "stream": True})
     acc = StreamAccumulator(call.started)
     events = _sse_events(gateway.container, body, call, [], upstream_chunks(), acc)
 

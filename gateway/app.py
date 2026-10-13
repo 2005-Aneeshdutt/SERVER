@@ -37,12 +37,16 @@ def create_app(
         container = await factory()
         app.state.container = container
         await container.request_log.start()
+        if container.capture is not None:
+            await container.capture.start()
         app.state.draining = False
         try:
             yield
         finally:
             app.state.draining = True  # /readyz -> 503 so the load balancer stops sending traffic
             await container.request_log.stop()
+            if container.capture is not None:
+                await container.capture.stop()
             for close in container.closers:
                 await close()
 
