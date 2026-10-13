@@ -1,0 +1,93 @@
+{
+  "by_task": {
+    "banking77-intent": {
+      "events": 100,
+      "simulated": 100,
+      "content_captured": 100,
+      "ok": 100,
+      "prompt_tokens": 52911,
+      "completion_tokens": 3876,
+      "list_price_cost_usd": "0.0101619000",
+      "pii_redactions": 0,
+      "served_alias": {
+        "groq-gpt-oss-120b": 100
+      }
+    },
+    "wikisql-sql": {
+      "events": 100,
+      "simulated": 100,
+      "content_captured": 100,
+      "ok": 100,
+      "prompt_tokens": 31147,
+      "completion_tokens": 5987,
+      "list_price_cost_usd": "0.0081873000",
+      "pii_redactions": 0,
+      "served_alias": {
+        "groq-gpt-oss-120b": 100
+      }
+    },
+    "fewnerd-entities": {
+      "events": 100,
+      "simulated": 100,
+      "content_captured": 100,
+      "ok": 100,
+      "prompt_tokens": 20203,
+      "completion_tokens": 9425,
+      "list_price_cost_usd": "0.0086232000",
+      "pii_redactions": 0,
+      "served_alias": {
+        "groq-gpt-oss-120b": 100
+      }
+    },
+    "noise-lmsys": {
+      "events": 100,
+      "simulated": 100,
+      "content_captured": 100,
+      "ok": 100,
+      "prompt_tokens": 5538,
+      "completion_tokens": 36868,
+      "list_price_cost_usd": "0.0000000000",
+      "pii_redactions": 0,
+      "served_alias": {
+        "sim-llama-70b-replay": 100
+      }
+    }
+  },
+  "parquet": {
+    "files": 28,
+    "rows": 400,
+    "distinct_events": 400
+  },
+  "sent": {
+    "banking77-intent": {
+      "200": 100
+    },
+    "wikisql-sql": {
+      "200": 100
+    },
+    "fewnerd-entities": {
+      "200": 100
+    },
+    "noise-lmsys": {
+      "200": 100
+    }
+  },
+  "scrubber_false_positives": {
+    "banking77-intent": {
+      "prompts": 400,
+      "changed": 0
+    },
+    "wikisql-sql": {
+      "prompts": 400,
+      "changed": 1
+    },
+    "fewnerd-entities": {
+      "prompts": 400,
+      "changed": 0
+    },
+    "noise-lmsys": {
+      "prompts": 800,
+      "changed": 2
+    }
+  }
+}
