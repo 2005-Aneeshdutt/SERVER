@@ -190,6 +190,48 @@ uv run python loadtest/run.py   # mock upstream (100 ms) + k6; 1 -> 2 -> 3 repli
 The load-test overlay points the gateway at a local mock LLM and blanks every real provider key,
 so a load test can never reach or bill a real provider. Results: [`loadtest/RESULTS.md`](loadtest/RESULTS.md).
 
+## Distillation (in progress: M5 of M5-M12)
+
+The next stage closes the loop. The gateway mines its own traffic for narrow, repeated tasks sent
+to a strong model, distills each one into a small fine-tuned model, gates it statistically, and
+rolls it out shadow, then canary, then full, with auto-rollback. The plan, schemas and tests are
+in [`PLAN.md`](PLAN.md). Everything is behind flags that default to off, and the budget is $0
+(free-tier APIs, free Kaggle/Colab GPUs).
+
+**M5: capture (done).** With `CAPTURE_ENABLED=true`:
+- every request becomes an event on Kafka (single KRaft broker);
+- a consumer writes the metadata to Postgres and the content to Parquet.
+
+Privacy and labelling:
+- Content is captured **only for keys that opt in** (`distill_opt_in`).
+- Emails, phone numbers and card numbers are scrubbed **inside the gateway, before the event
+  leaves the process**.
+- Traffic from keys flagged `simulated` (or sent with `X-Gateway-Simulated: 1`) is labelled
+  simulated in every event, row and file.
+
+**What capture costs on the hot path:** no request ever waits on it.
+- k6 (capture off, on, and on with the consumer paused, alternated over three rounds at 30 and
+  50 RPS) shows the three **indistinguishable within run-to-run noise**: see the "Distillation
+  capture" section of [`loadtest/RESULTS.md`](loadtest/RESULTS.md).
+- The more sensitive in-process measurement puts it at ~0.4 ms of CPU per request, with
+  worst-case PII-heavy prompts ([`loadtest/capture_cpu.md`](loadtest/capture_cpu.md)).
+- Getting there took four fixes, one of them a pre-existing gateway bug (a missing `sniffio`
+  made httpx retry a failed import on every request). They're written up in
+  [ADR 0015](docs/decisions/0015-capture-via-kafka.md).
+
+**Simulated traffic** drives it, from three public, checkable tasks: Banking77 intent
+classification, WikiSQL text-to-SQL scored by execution, and Few-NERD entity extraction to JSON.
+They're mixed with 2,000 Chatbot Arena prompts as noise, answered from M3's recorded Llama 3.3
+70B outputs at $0. Results: [`distill/RESULTS.md`](distill/RESULTS.md).
+
+```bash
+CAPTURE_ENABLED=true REPLAY_BASE_URL=http://replay-llm:9100/v1   docker compose --profile distill up -d                         # + Kafka, consumer, replay server
+uv run --group distill python -m distill.replay prepare --n 400  # download datasets -> data/tasks
+uv run --group distill python -m distill.replay key              # simulated, opted-in key
+uv run --group distill python -m distill.replay run --limit 100  # resumable, paced for free tiers
+docker compose --profile distill run --rm distill-tools python -m distill.report
+```
+
 ## Develop
 
 ```bash
@@ -210,6 +252,7 @@ Tests mock all provider HTTP with `respx`. No real API calls happen in tests or 
 | **M2c:** Postgres read replica, 3 replicas behind nginx, DB outage handling, k6 load tests | done; see `loadtest/RESULTS.md` |
 | **M3:** `model: "auto"` routing: rules, classifier, per-key quality, reproducible eval (RouteLLM metrics) | done; classifier ≈ heuristic for this model pair (see above) |
 | **M4:** playground, dashboard, kill switch, demo keys | done; see screenshots above |
+| **M5:** traffic capture (Kafka, Postgres + Parquet), PII scrubbing, opt-in, simulated-traffic replayer | done; see "Distillation" above |
 
 ### M1 verification
 - The official OpenAI SDK runs against the gateway (streaming and non-streaming) in tests with
