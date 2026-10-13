@@ -110,6 +110,33 @@ Shedding on, one replica. Goodput (OK latency p99) at each offered rate:
 | 32 | 79.1 (185.4 ms) | 75.9 (1391.6 ms) | 70.1 (1647.6 ms) |
 | 64 | 79.1 (294.8 ms) | 64.7 (4160.6 ms) | 57.4 (4151.8 ms) |
 
+## Distillation capture: overhead off vs on (1 replica)
+
+Same load, same key, capture **off** vs **on** (events PII-scrubbed and sent to a single-broker Kafka; the capture consumer running). Prompts are ~2000 characters with an email and a phone number, so scrubbing does real work. Rounds alternate off, on, off, on, ...: the spread between rounds of the *same* setting is the run-to-run noise on this laptop. **Gateway CPU / request** comes from the replica's cgroup counter, so it measures the gateway's own cost, independent of contention from the Kafka and consumer containers on the same machine. **on, consumer paused** stops the capture consumer for that run (events still reach Kafka): it shows how much of the *on* latency is the consumer competing for this laptop's cores. In-process CPU breakdown: `loadtest/capture_cpu.md`.
+
+| Capture | Round | RPS | Gateway CPU / request | Overhead p50 | p95 | p99 | Success |
+|---|---|---|---|---|---|---|---|
+| off | 1 | 30 | 11.74 ms | 3.8 ms | 6.2 ms | 8.3 ms | 100.00% |
+| off | 1 | 50 | 10.59 ms | 3.9 ms | 7.0 ms | 10.2 ms | 100.00% |
+| on | 1 | 30 | 10.69 ms | 3.7 ms | 6.3 ms | 8.4 ms | 100.00% |
+| on | 1 | 50 | 11.63 ms | 4.1 ms | 8.1 ms | 11.2 ms | 100.00% |
+| on, consumer paused | 1 | 30 | 10.84 ms | 3.8 ms | 6.8 ms | 8.7 ms | 100.00% |
+| on, consumer paused | 1 | 50 | 10.91 ms | 3.9 ms | 7.2 ms | 10.5 ms | 100.00% |
+| off | 2 | 30 | 9.68 ms | 3.5 ms | 5.8 ms | 7.3 ms | 100.00% |
+| off | 2 | 50 | 10.5 ms | 3.9 ms | 6.9 ms | 9.5 ms | 100.00% |
+| on | 2 | 30 | 11.09 ms | 3.7 ms | 7.0 ms | 8.8 ms | 100.00% |
+| on | 2 | 50 | 10.84 ms | 3.9 ms | 7.0 ms | 9.8 ms | 100.00% |
+| on, consumer paused | 2 | 30 | 10.99 ms | 3.6 ms | 6.5 ms | 9.3 ms | 100.00% |
+| on, consumer paused | 2 | 50 | 10.65 ms | 3.7 ms | 7.0 ms | 9.5 ms | 100.00% |
+| off | 3 | 30 | 10.38 ms | 3.6 ms | 6.1 ms | 7.6 ms | 100.00% |
+| off | 3 | 50 | 10.58 ms | 3.7 ms | 6.0 ms | 8.3 ms | 100.00% |
+| on | 3 | 30 | 10.54 ms | 3.5 ms | 5.7 ms | 7.4 ms | 100.00% |
+| on | 3 | 50 | 10.97 ms | 3.9 ms | 7.2 ms | 10.5 ms | 100.00% |
+| on, consumer paused | 3 | 30 | 10.97 ms | 3.7 ms | 6.4 ms | 8.1 ms | 100.00% |
+| on, consumer paused | 3 | 50 | 11.1 ms | 3.9 ms | 7.2 ms | 10.1 ms | 100.00% |
+
+Capture counters after the last *on* round (that replica's lifetime): 5304 events sent, 0 dropped.
+
 ## Analysis
 
 ### Headline
