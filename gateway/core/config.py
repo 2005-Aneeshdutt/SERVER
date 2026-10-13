@@ -30,6 +30,8 @@ class Settings(BaseSettings):
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
     # Ollama is optional: set e.g. http://localhost:11434/v1 to enable it.
     ollama_base_url: str | None = None
+    # Simulated traffic only: the recorded-answer replay server (distill/replay_llm.py).
+    replay_base_url: str | None = None
 
     connect_timeout_s: float = 5.0
     first_token_timeout_s: float = 20.0
@@ -71,6 +73,13 @@ class Settings(BaseSettings):
     demo_models: str = (
         "auto,or-llama-8b,or-llama-70b,groq-gpt-oss-20b,groq-gpt-oss-120b,gemini-flash-lite"
     )
+
+    # Distillation capture (M5): publish request/response events to Kafka. Off by default;
+    # needs the `capture` extra. Fails open (see docs/decisions/0015).
+    capture_enabled: bool = False
+    kafka_bootstrap: str = "localhost:9094"
+    capture_topic: str = "gateway.events.v1"
+    capture_queue_size: int = 10_000
 
     cache_ttl_s: float = 3600.0
     # Max time a request waits for an identical in-flight request before calling upstream itself.
