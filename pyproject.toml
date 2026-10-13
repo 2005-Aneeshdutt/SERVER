@@ -17,6 +17,10 @@ dependencies = [
     "pyyaml>=6.0",
     "tiktoken>=0.7",
     "prometheus-client>=0.20",
+    # Not imported by us: httpx/httpcore call `import sniffio` on every connection-pool
+    # operation and fall back to asyncio when it's missing. Each failed import scans sys.path
+    # on disk; profiling found that cost ~5 ms of CPU per request under load.
+    "sniffio>=1.3",
 ]
 
 [project.optional-dependencies]
@@ -24,6 +28,8 @@ dependencies = [
 # torch is listed directly: uv applies [tool.uv.sources] (the CPU wheel index) only to
 # direct dependencies, so as a transitive dep it silently resolved to the ~5 GB CUDA build.
 router = ["sentence-transformers>=3.0", "torch>=2.4"]
+# Traffic capture to Kafka (distillation, M5+). Only imported when CAPTURE_ENABLED=true.
+capture = ["aiokafka>=0.11"]
 
 [dependency-groups]
 # Offline routing evaluation: dataset labelling, classifier training, cost/quality curves.
@@ -37,6 +43,9 @@ dev = [
     "types-pyyaml>=6.0",
     "openai>=1.40",
 ]
+# Offline distillation pipeline: capture consumer (Kafka -> Postgres + Parquet), replayer,
+# discovery, dataset builder, eval. Never imported by the gateway itself.
+distill = ["aiokafka>=0.11", "pyarrow>=17"]
 
 [tool.uv]
 default-groups = ["dev"]
@@ -70,10 +79,13 @@ ignore = ["N818"]
 python_version = "3.12"
 strict = true
 plugins = ["pydantic.mypy"]
-files = ["gateway", "tests", "scripts", "eval"]
+files = ["gateway", "tests", "scripts", "eval", "distill", "loadtest/profile_capture.py"]
 
 [[tool.mypy.overrides]]
-module = ["tiktoken.*", "respx.*", "torch.*", "sentence_transformers.*", "sklearn.*", "numpy.*"]
+module = [
+    "tiktoken.*", "respx.*", "torch.*", "sentence_transformers.*", "sklearn.*", "numpy.*",
+    "aiokafka.*", "pyarrow.*",
+]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
