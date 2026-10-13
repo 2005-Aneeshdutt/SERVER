@@ -4,6 +4,7 @@
     uv run python loadtest/run.py --replicas 1 --rates 100,200 --duration 10s   # quick check
     uv run python loadtest/run.py --report-only   # rebuild RESULTS.md from results/*.json
     uv run python loadtest/run.py --overload-only # 1 replica past saturation, shedding off vs on
+    uv run python loadtest/run.py --capture-only  # distillation capture off vs on (overhead)
 
 For each replica count: scale `api`, restart nginx (it resolves replicas at startup), create a
 high-limit key via the admin API, then step the arrival rate until the gateway can't keep up.
@@ -43,6 +44,11 @@ OVERLOAD_RATES = (60, 80, 100, 130, 160, 200)
 # at saturation (Little's law: 80 RPS x 0.125 s = 10). See docs/decisions/0014.
 OVERLOAD_CAP = 16
 CAP_STUDY = ((8, 16, 32, 64), (80, 130, 200))
+# Capture overhead: same load with capture off and on, alternated twice (off, on, off, on) so
+# run-to-run noise on a shared laptop is visible next to the difference.
+CAPTURE_RATES = (30, 50)  # 70+ saturates one replica with 2 KB prompts even with capture off
+CAPTURE_ROUNDS = 3
+CAPTURE_PROMPT_CHARS = 2000
 
 
 def sh(args: list[str], capture: bool = False) -> str:
@@ -84,7 +90,7 @@ def scale(replicas: int, max_in_flight: int | None = None) -> None:
     raise SystemExit("gateway not ready through nginx")
 
 
-def create_key() -> str:
+def create_key(opt_in: bool = False) -> str:
     response = httpx.post(
         f"{GATEWAY}/admin/keys",
         headers={"Authorization": f"Bearer {admin_token()}"},
@@ -95,6 +101,9 @@ def create_key() -> str:
             "tpm_limit": 1_000_000_000,
             "monthly_spend_cap_usd": "100000",
             "allowed_models": ["gpt-4o-mini"],  # mock only: no fallback can reach a real provider
+            # Capture test: content is captured and PII-scrubbed (the expensive path).
+            "distill_opt_in": opt_in,
+            "simulated": True,
         },
         timeout=10,
     )
@@ -121,7 +130,9 @@ class StatsSampler(threading.Thread):
                 self.cpu[name.removeprefix("project1-")] = float(cpu.rstrip("%") or 0)
 
 
-def run_k6(rate: int, duration: str, key: str, label: str, stream: bool = False) -> dict[str, Any]:
+def run_k6(
+    rate: int, duration: str, key: str, label: str, stream: bool = False, prompt_chars: int = 0
+) -> dict[str, Any]:
     out = f"/results/{label}.json"
     seconds = float(duration.rstrip("s"))
     sampler = StatsSampler(delay_s=seconds / 2 + 3)  # +3s: `compose run` startup
@@ -129,6 +140,7 @@ def run_k6(rate: int, duration: str, key: str, label: str, stream: bool = False)
     sh([
         *COMPOSE, "run", "--rm", "-e", f"RATE={rate}", "-e", f"DURATION={duration}",
         "-e", f"KEY={key}", "-e", f"OUT={out}", "-e", f"STREAM={'1' if stream else '0'}",
+        "-e", f"PROMPT_CHARS={prompt_chars}",
         "k6", "run", "--quiet", "/loadtest/chat.js",
     ])  # fmt: skip
     sampler.join(timeout=30)
@@ -262,6 +274,76 @@ def cap_study() -> list[dict[str, Any]]:
     return rows
 
 
+def capture_metrics() -> dict[str, float]:
+    """Sent / dropped capture events, read from the replica's /metrics."""
+    text = httpx.get(f"{GATEWAY}/metrics", timeout=10).text
+    out: dict[str, float] = {}
+    for line in text.splitlines():
+        if line.startswith(("gateway_capture_sent_total", "gateway_capture_dropped_total")):
+            name, value = line.rsplit(" ", 1)
+            out[name] = float(value)
+    return out
+
+
+def api_cpu_usec() -> int:
+    """Cumulative CPU time of the (single) gateway replica, from its cgroup."""
+    out = sh([*COMPOSE, "exec", "-T", "api", "cat", "/sys/fs/cgroup/cpu.stat"], capture=True)
+    return int(next(line.split()[1] for line in out.splitlines() if line.startswith("usage_usec")))
+
+
+def capture_test() -> dict[str, Any]:
+    """1 replica, capture off vs on, alternated twice; Kafka + consumer running throughout."""
+    sh([*COMPOSE, "--profile", "distill", "up", "-d", "kafka", "capture-consumer"])
+    rounds: list[dict[str, Any]] = []
+    try:
+        for round_no in range(1, CAPTURE_ROUNDS + 1):
+            # "on, consumer paused": same capture, but the consumer container (Kafka reads,
+            # Parquet, Postgres inserts) is stopped. It shares this laptop's cores with the
+            # gateway, so the gap between the two "on" rows is co-location contention.
+            for label in ("off", "on", "on, consumer paused"):
+                os.environ["CAPTURE_ENABLED"] = "false" if label == "off" else "true"
+                consumer = "stop" if label == "on, consumer paused" else "start"
+                sh([*COMPOSE, "--profile", "distill", consumer, "capture-consumer"])
+                scale(1)
+                key = create_key(opt_in=True)
+                slug = label.replace(", ", "-").replace(" ", "-")
+                run_k6(50, "5s", key, f"warmup-capture-{slug}{round_no}", prompt_chars=500)
+                steps = []
+                for rate in CAPTURE_RATES:
+                    cpu_before = api_cpu_usec()
+                    step = run_k6(
+                        rate, "30s", key, f"capture-{slug}{round_no}-{rate}",
+                        prompt_chars=CAPTURE_PROMPT_CHARS,
+                    )  # fmt: skip
+                    # Gateway CPU per request: isolates the replica's own cost from contention
+                    # by other containers (Kafka, the consumer) on this shared laptop.
+                    requests = step["achieved_rps"] * 30
+                    step["api_cpu_ms_per_request"] = round(
+                        (api_cpu_usec() - cpu_before) / 1000 / requests, 2
+                    )
+                    steps.append(step)
+                    o = step["gateway_overhead_ms"]
+                    print(
+                        f"  capture {label} (round {round_no}) @ {rate} rps -> overhead "
+                        f"p50/p95/p99 {o['med']}/{o['p(95)']}/{o['p(99)']}ms "
+                        f"cpu {step['api_cpu_ms_per_request']}ms/req "
+                        f"ok {step['success_rate']:.4f}",
+                        flush=True,
+                    )
+                rounds.append(
+                    {
+                        "capture": label,
+                        "round": round_no,
+                        "steps": steps,
+                        "metrics": capture_metrics(),
+                    }
+                )
+    finally:
+        os.environ.pop("CAPTURE_ENABLED", None)
+        sh([*COMPOSE, "--profile", "distill", "start", "capture-consumer"])
+    return {"prompt_chars": CAPTURE_PROMPT_CHARS, "rounds": rounds}
+
+
 def write_report(data: dict[str, Any]) -> None:
     from loadtest.report import render  # local import: report is plain formatting
 
@@ -279,6 +361,9 @@ def main() -> None:
     parser.add_argument(
         "--overload-only", action="store_true", help="rerun the load-shedding test only"
     )
+    parser.add_argument(
+        "--capture-only", action="store_true", help="rerun the capture overhead test only"
+    )
     parser.add_argument("--report-only", action="store_true")
     parser.add_argument(
         "--extras-only", action="store_true", help="rerun streaming + failover, keep the sweeps"
@@ -294,6 +379,11 @@ def main() -> None:
     if args.overload_only:
         data = json.loads(results_file.read_text(encoding="utf-8"))
         data["overload"] = overload_test()
+        _restore_and_save(data, results_file)
+        return
+    if args.capture_only:
+        data = json.loads(results_file.read_text(encoding="utf-8"))
+        data["capture"] = capture_test()
         _restore_and_save(data, results_file)
         return
     if args.extras_only:

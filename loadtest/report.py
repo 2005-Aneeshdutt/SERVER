@@ -168,6 +168,49 @@ def _overload(data: dict[str, Any]) -> list[str]:
     return lines
 
 
+def _capture(data: dict[str, Any]) -> list[str]:
+    if "capture" not in data:
+        return []
+    c = data["capture"]
+    lines = [
+        "",
+        "## Distillation capture: overhead off vs on (1 replica)",
+        "",
+        f"Same load, same key, capture **off** vs **on** (events PII-scrubbed and sent to a "
+        f"single-broker Kafka; the capture consumer running). Prompts are ~{c['prompt_chars']} "
+        "characters with an email and a phone number, so scrubbing does real work. Rounds "
+        "alternate off, on, off, on, ...: the spread between rounds of the *same* setting is "
+        "the run-to-run noise on this laptop. **Gateway CPU / request** comes from the "
+        "replica's cgroup counter, so it measures the gateway's own cost, independent of "
+        "contention from the Kafka and consumer containers on the same machine. "
+        "**on, consumer paused** stops the capture consumer for that run (events still reach "
+        "Kafka): it shows how much of the *on* latency is the consumer competing for this "
+        "laptop's cores. In-process CPU breakdown: `loadtest/capture_cpu.md`.",
+        "",
+        "| Capture | Round | RPS | Gateway CPU / request | Overhead p50 | p95 | p99 | Success |",
+        "|---|---|---|---|---|---|---|---|",
+    ]
+    for r in c["rounds"]:
+        for s in r["steps"]:
+            o = s["gateway_overhead_ms"]
+            lines.append(
+                f"| {r['capture']} | {r['round']} | {s['target_rps']} "
+                f"| {s.get('api_cpu_ms_per_request', '-')} ms | {_ms(o, 'med')} ms "
+                f"| {_ms(o, 'p(95)')} ms | {_ms(o, 'p(99)')} ms | {s['success_rate'] * 100:.2f}% |"
+            )
+    on = [r for r in c["rounds"] if r["capture"].startswith("on")]
+    if on:
+        m = on[-1]["metrics"]
+        sent = int(m.get("gateway_capture_sent_total", 0))
+        dropped = int(sum(v for k, v in m.items() if k.startswith("gateway_capture_dropped")))
+        lines += [
+            "",
+            f"Capture counters after the last *on* round (that replica's lifetime): "
+            f"{sent} events sent, {dropped} dropped.",
+        ]
+    return lines
+
+
 def render(data: dict[str, Any]) -> str:
     sweeps = data["sweeps"]
     lines = [
@@ -197,6 +240,7 @@ def render(data: dict[str, Any]) -> str:
         )
     lines += _extras(data)
     lines += _overload(data)
+    lines += _capture(data)
     if ANALYSIS.exists():
         lines += ["", ANALYSIS.read_text(encoding="utf-8").strip()]
     return "\n".join(lines) + "\n"

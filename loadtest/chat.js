@@ -15,6 +15,12 @@ const shed = new Counter("shed");
 const RATE = parseInt(__ENV.RATE || "100");
 const URL = __ENV.URL || "http://nginx:8000";
 const STREAM = __ENV.STREAM === "1";
+// Optional realistic prompt size (capture test): a system prompt plus a user message padded to
+// PROMPT_CHARS, containing an email and a phone number so PII scrubbing does real work.
+const PROMPT_CHARS = parseInt(__ENV.PROMPT_CHARS || "0");
+const FILLER =
+  "Hi, my card payment was declined twice today. You can reach me at jane.doe@example.com " +
+  "or +1 415 555 0132. ";
 
 export const options = {
   discardResponseBodies: !STREAM,
@@ -47,7 +53,15 @@ export default function () {
     temperature: 0.7,
     max_tokens: 64,
     stream: STREAM,
-    messages: [{ role: "user", content: `load test ${__VU}-${__ITER}` }],
+    messages: PROMPT_CHARS
+      ? [
+          { role: "system", content: "You are a support assistant for a bank." },
+          {
+            role: "user",
+            content: `load test ${__VU}-${__ITER} ` + FILLER.repeat(Math.ceil(PROMPT_CHARS / FILLER.length)).slice(0, PROMPT_CHARS),
+          },
+        ]
+      : [{ role: "user", content: `load test ${__VU}-${__ITER}` }],
   });
   const res = http.post(`${URL}/v1/chat/completions`, body, params);
   check(res, { "status 200": (r) => r.status === 200 });
