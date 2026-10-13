@@ -9,6 +9,7 @@ from gateway.providers.gemini import GeminiProvider
 from gateway.providers.groq import GroqProvider
 from gateway.providers.ollama import OllamaProvider
 from gateway.providers.openai import OpenAIProvider
+from gateway.providers.openai_compat import OpenAICompatibleProvider
 from gateway.providers.openrouter import OpenRouterProvider
 
 
@@ -34,4 +35,8 @@ def build_providers(settings: Settings, client: httpx.AsyncClient) -> dict[str, 
         providers["openrouter"] = OpenRouterProvider(client, settings.openrouter_base_url, key)
     if settings.ollama_base_url:
         providers["ollama"] = OllamaProvider(client, settings.ollama_base_url)
+    if settings.replay_base_url:
+        providers["replay"] = OpenAICompatibleProvider(
+            "replay", client, settings.replay_base_url, None
+        )
     return providers

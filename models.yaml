@@ -97,3 +97,14 @@ models:
     output_price_per_mtok: "0"
     context_window: 131072
     tier: cheap
+
+  # SIMULATED TRAFFIC ONLY (distillation replayer). Not a model: replays the answers Llama 3.3
+  # 70B actually gave in the M3 eval (eval/data/generations.jsonl). Nothing is called, so it
+  # costs $0. Only available when REPLAY_BASE_URL points at distill/replay_llm.py.
+  sim-llama-70b-replay:
+    provider: replay
+    upstream_model: recorded/meta-llama/llama-3.3-70b-instruct
+    input_price_per_mtok: "0"
+    output_price_per_mtok: "0"
+    context_window: 131072
+    tier: strong

@@ -10,7 +10,10 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from gateway.core.errors import ModelNotFound
 
-KNOWN_PROVIDERS = frozenset({"openai", "anthropic", "gemini", "groq", "openrouter", "ollama"})
+# "replay" serves recorded answers for simulated traffic only (distill/replay_llm.py).
+KNOWN_PROVIDERS = frozenset(
+    {"openai", "anthropic", "gemini", "groq", "openrouter", "ollama", "replay"}
+)
 _PER_MILLION = Decimal(1_000_000)
 
 
