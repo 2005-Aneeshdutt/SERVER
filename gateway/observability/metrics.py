@@ -77,3 +77,10 @@ SPEND_SETTLE_FAILURES = Counter(
     "gateway_spend_settle_failures_total",
     "Served requests whose cost never reached the Redis spend total (settle retries exhausted)",
 )
+CAPTURE_SENT = Counter("gateway_capture_sent_total", "Capture events handed to Kafka")
+CAPTURE_DROPPED = Counter(
+    "gateway_capture_dropped_total",
+    "Capture events dropped (capture fails open: requests are never affected)",
+    ["reason"],
+)
+CAPTURE_BACKLOG = Gauge("gateway_capture_backlog", "Capture events waiting in the in-process queue")
