@@ -28,6 +28,11 @@ services:
       DEMO_ENABLED: ${DEMO_ENABLED:-true}
       # Reach an Ollama running on the host (optional).
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434/v1}
+      # Distillation capture (off by default): CAPTURE_ENABLED=true + `--profile distill`.
+      CAPTURE_ENABLED: ${CAPTURE_ENABLED:-false}
+      KAFKA_BOOTSTRAP: kafka:9092
+      # Simulated noise traffic ($0 recorded answers); set to http://replay-llm:9100/v1.
+      REPLAY_BASE_URL: ${REPLAY_BASE_URL:-}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     healthcheck:
@@ -101,7 +106,86 @@ services:
       interval: 2s
       retries: 30
 
+  # ---- distillation (M5+): only with `docker compose --profile distill up -d` ----------------
+  kafka:
+    # Single-node KRaft broker (no ZooKeeper). One broker = no replication: capture is
+    # best-effort by design and fails open (docs/decisions/0015).
+    image: apache/kafka:3.9.0
+    profiles: ["distill"]
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:9094
+      # In-network clients use kafka:9092; tools and tests on the host use localhost:9094.
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://localhost:9094
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_NUM_PARTITIONS: 3
+      KAFKA_LOG_RETENTION_HOURS: 720  # 30 days: datasets can be rebuilt by replaying the topic
+      KAFKA_HEAP_OPTS: "-Xmx512m -Xms512m"  # fits the 8 GB Docker Desktop VM
+    ports:
+      - "9094:9094"
+    volumes:
+      - kafkadata:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 >/dev/null 2>&1"]
+      interval: 5s
+      retries: 30
+
+  capture-consumer:
+    # Kafka -> Postgres (metadata) + Parquet (content, opted-in keys only) in ./data/capture.
+    image: llm-gateway:local
+    profiles: ["distill"]
+    command: ["python", "-m", "distill.consumer"]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://gateway:gateway@postgres:5432/gateway
+      KAFKA_BOOTSTRAP: kafka:9092
+      CAPTURE_PARQUET_DIR: /data/capture
+    volumes:
+      # A named volume, not a bind mount: writing many files into a synced or Windows-shared
+      # folder costs host CPU (measured: a OneDrive-synced checkout spent ~1 core syncing them).
+      - capturedata:/data/capture
+    depends_on:
+      kafka:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  distill-tools:
+    # Offline distillation commands against the captured data, e.g.
+    #   docker compose --profile distill run --rm distill-tools python -m distill.report
+    image: llm-gateway:local
+    profiles: ["distill"]
+    command: ["python", "-m", "distill.report"]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://gateway:gateway@postgres:5432/gateway
+      KAFKA_BOOTSTRAP: kafka:9092
+      CAPTURE_PARQUET_DIR: /data/capture
+    volumes:
+      - capturedata:/data/capture
+      - ./distill:/app/distill        # code and results (RESULTS.md, results/*.json)
+      - ./data/tasks:/app/data/tasks:ro
+      - ./data/replay:/app/data/replay:ro
+      - ./loadtest/RESULTS.md:/app/loadtest/RESULTS.md:ro
+
+  replay-llm:
+    # Recorded answers for simulated noise traffic (no model is called).
+    image: llm-gateway:local
+    profiles: ["distill"]
+    command: ["uvicorn", "distill.replay_llm:app", "--host", "0.0.0.0", "--port", "9100", "--no-access-log"]
+    environment:
+      REPLAY_DATA_DIR: /eval-data
+    volumes:
+      - ./eval/data:/eval-data:ro
+
 volumes:
+  capturedata:
+  kafkadata:
   pgdata:
   pgreplica:
   redisdata:

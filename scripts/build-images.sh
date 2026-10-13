@@ -9,7 +9,7 @@ cd "$(dirname "$0")/.."
 
 context() {
   tar --exclude=./.venv --exclude=./.git --exclude=./web/node_modules --exclude=./web/dist \
-      --exclude=./eval/data --exclude=./loadtest/results --exclude='*/__pycache__' -cf - .
+      --exclude=./eval/data --exclude=./data --exclude=./loadtest/results --exclude='*/__pycache__' -cf - .
 }
 
 context | docker build -t llm-gateway:local -f Dockerfile -

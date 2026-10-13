@@ -10,14 +10,17 @@ ENV UV_COMPILE_BYTECODE=1 \
 
 WORKDIR /app
 COPY pyproject.toml uv.lock ./
-# The "router" extra (CPU-only torch + sentence-transformers) powers model="auto".
-RUN uv sync --frozen --no-dev --extra router --no-install-project
+# The "router" extra (CPU-only torch + sentence-transformers) powers model="auto". The
+# "capture" extra and "distill" group power distillation capture and its consumer (both off
+# unless enabled; the same image runs the gateway and the capture-consumer service).
+RUN uv sync --frozen --no-dev --extra router --extra capture --group distill --no-install-project
 
 COPY gateway ./gateway
+COPY distill ./distill
 COPY migrations ./migrations
 COPY alembic.ini models.yaml README.md ./
 # Bake the tokenizer and the embedding model into the image: no downloads at startup.
-RUN uv sync --frozen --no-dev --extra router \
+RUN uv sync --frozen --no-dev --extra router --extra capture --group distill \
     && python -c "import tiktoken; tiktoken.get_encoding('o200k_base')" \
     && python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('BAAI/bge-small-en-v1.5')"
 ENV HF_HUB_OFFLINE=1

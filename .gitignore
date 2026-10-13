@@ -11,3 +11,6 @@ eval/.cache/
 
 # Recomputable embedding cache (python -m eval.run rebuilds it)
 eval/data/embeddings.jsonl
+
+# Distillation data (captured content, datasets): local only
+/data/
