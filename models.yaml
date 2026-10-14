@@ -108,3 +108,19 @@ models:
     output_price_per_mtok: "0"
     context_window: 131072
     tier: strong
+
+  # Distilled model (M8): Qwen2.5-0.5B fine-tuned on Banking77 traffic that
+  # groq-gpt-oss-120b answered (distill/, train/). Self-hosted with llama.cpp: no per-token
+  # price (its compute isn't priced; see distill/RESULTS.md). Served only through a rollout,
+  # which falls back to the strong model on failure.
+  distilled-banking77-intent-v1:
+    provider: llamacpp
+    upstream_model: banking77-intent-v1
+    input_price_per_mtok: "0"
+    output_price_per_mtok: "0"
+    context_window: 2048
+    tier: cheap
+    supports_tools: false
+    supports_json: false
+    distilled_task: banking77-intent
+    fallbacks: [groq-gpt-oss-120b]

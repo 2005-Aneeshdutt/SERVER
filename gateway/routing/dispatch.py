@@ -96,7 +96,13 @@ class Dispatcher:
 
     def candidates(self, spec: ModelSpec, key: ApiKeyRecord) -> list[ModelSpec]:
         chain = [spec, *(self._registry.get(alias) for alias in spec.fallbacks)]
-        return [s for s in chain if s.provider in self.providers and key.may_use(s.alias)]
+        # A distilled substitute is allowed whenever the key may use the alias it stands in for
+        # (that was checked on the request); clients can't request distilled aliases directly.
+        return [
+            s
+            for s in chain
+            if s.provider in self.providers and (key.may_use(s.alias) or s.distilled_task)
+        ]
 
     async def complete(
         self, req: ChatRequest, key: ApiKeyRecord, trace: DispatchTrace

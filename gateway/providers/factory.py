@@ -7,6 +7,7 @@ from gateway.providers.anthropic import AnthropicProvider
 from gateway.providers.base import Provider
 from gateway.providers.gemini import GeminiProvider
 from gateway.providers.groq import GroqProvider
+from gateway.providers.llamacpp import LlamaCppProvider
 from gateway.providers.ollama import OllamaProvider
 from gateway.providers.openai import OpenAIProvider
 from gateway.providers.openai_compat import OpenAICompatibleProvider
@@ -35,6 +36,8 @@ def build_providers(settings: Settings, client: httpx.AsyncClient) -> dict[str, 
         providers["openrouter"] = OpenRouterProvider(client, settings.openrouter_base_url, key)
     if settings.ollama_base_url:
         providers["ollama"] = OllamaProvider(client, settings.ollama_base_url)
+    if settings.llamacpp_base_url:
+        providers["llamacpp"] = LlamaCppProvider(client, settings.llamacpp_base_url)
     if settings.replay_base_url:
         providers["replay"] = OpenAICompatibleProvider(
             "replay", client, settings.replay_base_url, None

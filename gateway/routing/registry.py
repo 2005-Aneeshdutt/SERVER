@@ -12,7 +12,7 @@ from gateway.core.errors import ModelNotFound
 
 # "replay" serves recorded answers for simulated traffic only (distill/replay_llm.py).
 KNOWN_PROVIDERS = frozenset(
-    {"openai", "anthropic", "gemini", "groq", "openrouter", "ollama", "replay"}
+    {"openai", "anthropic", "gemini", "groq", "openrouter", "ollama", "replay", "llamacpp"}
 )
 _PER_MILLION = Decimal(1_000_000)
 
@@ -31,6 +31,9 @@ class ModelSpec(BaseModel):
     supports_tools: bool = True
     supports_vision: bool = False
     supports_json: bool = True
+    # Distilled models (M8): the task they were fine-tuned for. Only reachable through a
+    # rollout (gateway/distill/rollout.py), which substitutes them for the task's source alias.
+    distilled_task: str | None = None
 
     @field_validator("input_price_per_mtok", "output_price_per_mtok", mode="before")
     @classmethod

@@ -32,6 +32,8 @@ class Settings(BaseSettings):
     ollama_base_url: str | None = None
     # Simulated traffic only: the recorded-answer replay server (distill/replay_llm.py).
     replay_base_url: str | None = None
+    # Distilled models served by llama.cpp (M8), e.g. http://llamacpp:8080/v1.
+    llamacpp_base_url: str | None = None
 
     connect_timeout_s: float = 5.0
     first_token_timeout_s: float = 20.0
@@ -80,6 +82,15 @@ class Settings(BaseSettings):
     kafka_bootstrap: str = "localhost:9094"
     capture_topic: str = "gateway.events.v1"
     capture_queue_size: int = 10_000
+
+    # Distilled-model rollout (M10): off by default. Rollback when, over the window, at least
+    # `min_samples` distilled answers were seen and the 95% Wilson lower bound of their failure
+    # rate exceeds the threshold.
+    distill_rollout_enabled: bool = False
+    distill_window_minutes: int = 10
+    distill_min_samples: int = 50
+    distill_failure_threshold: float = 0.05
+    distill_shadow_concurrency: int = 4
 
     cache_ttl_s: float = 3600.0
     # Max time a request waits for an identical in-flight request before calling upstream itself.
