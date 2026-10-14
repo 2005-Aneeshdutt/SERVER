@@ -84,3 +84,8 @@ CAPTURE_DROPPED = Counter(
     ["reason"],
 )
 CAPTURE_BACKLOG = Gauge("gateway_capture_backlog", "Capture events waiting in the in-process queue")
+DISTILL_REQUESTS = Counter(
+    "gateway_distill_requests_total",
+    "Distilled-model rollout events: distilled, failed, rolled_back, shadow, shadow_skipped",
+    ["task", "event"],
+)

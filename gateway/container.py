@@ -19,12 +19,14 @@ from gateway.core import tokens
 from gateway.core.auth import CachedKeyStore, KeyStore
 from gateway.core.config import Settings
 from gateway.db.repositories import (
+    SqlDistillAudit,
     SqlKeyStore,
     SqlRequestLogSink,
     SqlSpendLedger,
     SqlUsageReader,
 )
 from gateway.db.session import make_engine, make_sessionmaker
+from gateway.distill.rollout import RolloutConfig, RolloutController
 from gateway.limits.ratelimit import RateLimiter, RedisRateLimiter
 from gateway.limits.spend import RedisSpendLimiter, SpendLimiter
 from gateway.observability.request_log import RequestLogWriter
@@ -56,6 +58,8 @@ class Container:
     router: SmartRouter | None = None  # model="auto"; None if the router isn't installed
     redis: Redis | None = None  # shared state for small counters (demo-key quota)
     capture: CaptureProducer | None = None  # distillation capture; None unless enabled
+    rollout: RolloutController | None = None  # distilled-model rollout; None unless enabled
+    distill_audit: SqlDistillAudit | None = None
     # name -> coroutine that raises if the dependency is unhealthy (used by /readyz)
     readiness: dict[str, ReadinessCheck] = field(default_factory=dict)
     closers: list[Callable[[], Awaitable[None]]] = field(default_factory=list)
@@ -116,6 +120,8 @@ async def build_container(settings: Settings) -> Container:
     await asyncio.to_thread(tokens.warm_up)
     router = await build_router(settings, registry, breaker)
     spend = RedisSpendLimiter(redis, SqlSpendLedger(sessions), settings.spend_reservation_ttl_s)
+    audit = SqlDistillAudit(sessions)
+    rollout = _rollout(settings, redis, registry, providers, audit)
     return Container(
         settings=settings,
         registry=registry,
@@ -136,6 +142,8 @@ async def build_container(settings: Settings) -> Container:
         router=router,
         redis=redis,
         capture=_capture(settings),
+        rollout=rollout,
+        distill_audit=audit,
         readiness={
             "redis": _redis_check(redis),
             "postgres": _postgres_check(engine),
@@ -143,6 +151,7 @@ async def build_container(settings: Settings) -> Container:
         },
         closers=[
             spend.close,  # before redis.aclose: pending settle retries need Redis
+            *([rollout.close] if rollout else []),
             http_client.aclose,
             engine.dispose,
             redis.aclose,
@@ -150,6 +159,24 @@ async def build_container(settings: Settings) -> Container:
             *([_closer(router.close)] if router else []),
         ],
     )
+
+
+def _rollout(
+    settings: Settings,
+    redis: Redis,
+    registry: ModelRegistry,
+    providers: Mapping[str, Provider],
+    audit: SqlDistillAudit,
+) -> RolloutController | None:
+    if not settings.distill_rollout_enabled:
+        return None
+    config = RolloutConfig(
+        window_minutes=settings.distill_window_minutes,
+        min_samples=settings.distill_min_samples,
+        failure_threshold=settings.distill_failure_threshold,
+        shadow_concurrency=settings.distill_shadow_concurrency,
+    )
+    return RolloutController(redis, registry, providers, audit.write, config)
 
 
 def _capture(settings: Settings) -> CaptureProducer | None:
