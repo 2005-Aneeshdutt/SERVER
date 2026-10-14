@@ -33,6 +33,10 @@ services:
       KAFKA_BOOTSTRAP: kafka:9092
       # Simulated noise traffic ($0 recorded answers); set to http://replay-llm:9100/v1.
       REPLAY_BASE_URL: ${REPLAY_BASE_URL:-}
+      # Distilled models (M8+); set to http://llamacpp:8080/v1 with `--profile distill`.
+      LLAMACPP_BASE_URL: ${LLAMACPP_BASE_URL:-}
+      # Distilled-model rollout (M10, off by default): shadow / canary / full + auto-rollback.
+      DISTILL_ROLLOUT_ENABLED: ${DISTILL_ROLLOUT_ENABLED:-false}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     healthcheck:
@@ -156,6 +160,39 @@ services:
       migrate:
         condition: service_completed_successfully
 
+  llamacpp:
+    # Distilled model server (M8): llama.cpp's OpenAI-compatible server on CPU. Models live
+    # outside the repo (DISTILL_MODELS_DIR): a synced or shared folder makes loading slow.
+    image: ghcr.io/ggml-org/llama.cpp:server-b11011
+    profiles: ["distill"]
+    command:
+      - "-m"
+      - "/models/${DISTILLED_MODEL:-banking77-intent/v1}/model.gguf"
+      - "--alias"
+      - "${DISTILLED_ALIAS:-banking77-intent-v1}"
+      - "--host"
+      - "0.0.0.0"
+      - "--port"
+      - "8080"
+      - "-c"
+      - "4096"
+      - "-np"
+      - "4"          # 4 parallel slots (1024 tokens each): concurrent requests batch together
+      - "-t"
+      - "4"
+      - "--cache-reuse"
+      - "256"        # reuse KV cache for shared prompt prefixes (the task tag + chat template)
+      - "--grammar-file"
+      - "/models/${DISTILLED_MODEL:-banking77-intent/v1}/grammar.gbnf"  # constrained decoding
+    volumes:
+      - ${DISTILL_MODELS_DIR:-./models}:/models:ro
+    ports:
+      - "8081:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/health"]
+      interval: 5s
+      retries: 30
+
   distill-tools:
     # Offline distillation commands against the captured data, e.g.
     #   docker compose --profile distill run --rm distill-tools python -m distill.report
@@ -169,8 +206,11 @@ services:
     volumes:
       - capturedata:/data/capture
       - ./distill:/app/distill        # code and results (RESULTS.md, results/*.json)
+      - ./gateway:/app/gateway:ro     # tools run the working tree's code, not the image's
+      - ./models.yaml:/app/models.yaml:ro
       - ./data/tasks:/app/data/tasks:ro
       - ./data/replay:/app/data/replay:ro
+      - ./data/distill:/app/data/distill  # discovered tasks and built datasets (small files)
       - ./loadtest/RESULTS.md:/app/loadtest/RESULTS.md:ro
 
   replay-llm:
