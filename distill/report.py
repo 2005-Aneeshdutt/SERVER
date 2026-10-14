@@ -19,12 +19,14 @@ from sqlalchemy import select
 
 from distill.datasets import TASKS, read
 from distill.replay import KEY_ID_FILE, SENT_FILE, TASK_NAMES
+from distill.report_distill import render_distillation
 from gateway.capture.fingerprint import system_fingerprint
 from gateway.capture.pii import scrub
 from gateway.core.config import Settings
 from gateway.core.schemas import ChatMessage
 from gateway.db.models import CaptureEventRow
-from gateway.db.session import make_engine
+from gateway.db.repositories import SqlDistillAudit
+from gateway.db.session import make_engine, make_sessionmaker
 
 OUT = Path("distill/results")
 PARQUET = Path(os.environ.get("CAPTURE_PARQUET_DIR", "data/capture"))
@@ -119,7 +121,9 @@ def scrubber_hits() -> dict[str, dict[str, int]]:
     return out
 
 
-def render(data: dict[str, Any], load: dict[str, Any] | None) -> str:
+def render(
+    data: dict[str, Any], load: dict[str, Any] | None, distill: list[str] | None = None
+) -> str:
     lines = [
         "# Distillation results",
         "",
@@ -171,6 +175,8 @@ def render(data: dict[str, Any], load: dict[str, Any] | None) -> str:
     ]
     if load is not None:
         lines += ["", "### Overhead on the hot path", "", load["text"]]
+    if distill:
+        lines += ["", *distill]
     return "\n".join(lines) + "\n"
 
 
@@ -196,7 +202,10 @@ def main() -> None:
     }
     OUT.mkdir(parents=True, exist_ok=True)
     (OUT / "m5_capture.json").write_text(json.dumps(data, indent=2), encoding="utf-8")
-    Path("distill/RESULTS.md").write_text(render(data, load_overhead()), encoding="utf-8")
+    sessions = make_sessionmaker(make_engine(settings.database_url))
+    events = asyncio.run(SqlDistillAudit(sessions).recent(50))
+    distill = render_distillation(events, "banking77-intent")
+    Path("distill/RESULTS.md").write_text(render(data, load_overhead(), distill), encoding="utf-8")
     print(json.dumps(data, indent=2))
 
 
