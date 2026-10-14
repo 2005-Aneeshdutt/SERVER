@@ -37,6 +37,7 @@ class ApiKeyRow(Base):
     routing_quality: Mapped[str] = mapped_column(String(16), default="balanced")
     distill_opt_in: Mapped[bool] = mapped_column(Boolean, default=False)
     simulated: Mapped[bool] = mapped_column(Boolean, default=False)
+    distill_serving: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -100,3 +101,20 @@ class CaptureEventRow(Base):
     parquet_path: Mapped[str | None] = mapped_column(String(500))
     kafka_partition: Mapped[int] = mapped_column(Integer)
     kafka_offset: Mapped[int] = mapped_column(BigInteger)
+
+
+class DistillAuditRow(Base):
+    """Every rollout change: registration, manual state changes, automatic rollbacks."""
+
+    __tablename__ = "distill_audit"
+    __table_args__ = (Index("ix_distill_audit_ts", "ts"),)
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    ts: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    task: Mapped[str] = mapped_column(String(100))
+    system_fingerprint: Mapped[str] = mapped_column(String(32))
+    action: Mapped[str] = mapped_column(String(32))
+    state: Mapped[str] = mapped_column(String(32))
+    weight: Mapped[float] = mapped_column(Float)
+    actor: Mapped[str] = mapped_column(String(32))
+    reason: Mapped[str] = mapped_column(String(500))

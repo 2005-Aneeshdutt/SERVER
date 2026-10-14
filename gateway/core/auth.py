@@ -34,6 +34,9 @@ class ApiKeyRecord:
     # (PII-scrubbed)? Is its traffic simulated (replayer, load tests)? See PLAN.md.
     distill_opt_in: bool = False
     simulated: bool = False
+    # May this key be served by a distilled model during a rollout (M10)? A separate consent
+    # from contributing training data.
+    distill_serving: bool = False
 
     def may_use(self, alias: str) -> bool:
         return self.allowed_models is None or alias in self.allowed_models

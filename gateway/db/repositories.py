@@ -11,7 +11,7 @@ from sqlalchemy.exc import InterfaceError, OperationalError
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from gateway.core.auth import ApiKeyRecord, generate_key, hash_key
-from gateway.db.models import ApiKeyRow, RequestRow
+from gateway.db.models import ApiKeyRow, DistillAuditRow, RequestRow
 from gateway.observability.metrics import REPLICA_FALLBACKS
 from gateway.observability.request_log import RequestRecord
 
@@ -31,6 +31,7 @@ def _to_record(row: ApiKeyRow) -> ApiKeyRecord:
         routing_quality=row.routing_quality,
         distill_opt_in=row.distill_opt_in,
         simulated=row.simulated,
+        distill_serving=row.distill_serving,
     )
 
 
@@ -54,6 +55,7 @@ class SqlKeyStore:
         routing_quality: str = "balanced",
         distill_opt_in: bool = False,
         simulated: bool = False,
+        distill_serving: bool = False,
     ) -> tuple[str, ApiKeyRecord]:
         """Returns (raw key, record). The raw key is never stored and can't be recovered."""
         raw = generate_key()
@@ -69,6 +71,7 @@ class SqlKeyStore:
             routing_quality=routing_quality,
             distill_opt_in=distill_opt_in,
             simulated=simulated,
+            distill_serving=distill_serving,
         )
         async with self._sessions() as session, session.begin():
             session.add(row)
@@ -285,3 +288,32 @@ class SqlUsageReader:
         if key_id is not None:
             query = query.where(r.key_id == key_id)
         return query
+
+
+class SqlDistillAudit:
+    """Rollout audit trail (writes go to the primary; reads for the dashboard too: it's tiny)."""
+
+    def __init__(self, sessions: async_sessionmaker[AsyncSession]) -> None:
+        self._sessions = sessions
+
+    async def write(self, event: dict[str, Any]) -> None:
+        async with self._sessions() as session, session.begin():
+            session.add(DistillAuditRow(**event))
+
+    async def recent(self, limit: int = 50) -> list[dict[str, Any]]:
+        async with self._sessions() as session:
+            rows = await session.scalars(
+                select(DistillAuditRow).order_by(DistillAuditRow.id.desc()).limit(limit)
+            )
+            return [
+                {
+                    "ts": r.ts.isoformat(),
+                    "task": r.task,
+                    "action": r.action,
+                    "state": r.state,
+                    "weight": r.weight,
+                    "actor": r.actor,
+                    "reason": r.reason,
+                }
+                for r in rows
+            ]
