@@ -251,10 +251,16 @@ class SqlUsageReader:
         return [dict(row) for row in rows]
 
     async def _replica_lag_s(self) -> float | None:
-        """Seconds since the last replayed transaction. Overstates lag when the primary is idle
-        (nothing to replay), so it's an upper bound, which is what a dashboard banner needs."""
+        """Replication lag in seconds: 0 when the replica has replayed everything it received,
+        otherwise the age of the last replayed transaction.
+
+        `now() - pg_last_xact_replay_timestamp()` alone grows while the *primary* is idle (there
+        is nothing new to replay), which made a fully caught-up replica show "36 min" of lag."""
         assert self._replica is not None
-        query = text("select extract(epoch from now() - pg_last_xact_replay_timestamp())")
+        query = text(
+            "select case when pg_last_wal_receive_lsn() = pg_last_wal_replay_lsn() then 0 "
+            "else extract(epoch from now() - pg_last_xact_replay_timestamp()) end"
+        )
         try:
             async with self._replica() as session:
                 lag = await session.scalar(query)
