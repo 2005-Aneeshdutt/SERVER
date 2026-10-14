@@ -5,12 +5,34 @@ import {
   createDemoKey,
   listModels,
   type ChatResult,
+  type DistillInfo,
   type Message,
   type ModelInfo,
 } from "../api";
-import { ms, usd } from "../format";
+import { count, ms, usd } from "../format";
 import { useStored } from "../hooks";
+import {
+  IconAlert,
+  IconArrowRight,
+  IconClock,
+  IconCoins,
+  IconDatabase,
+  IconEye,
+  IconEyeOff,
+  IconFlask,
+  IconGauge,
+  IconHash,
+  IconHistory,
+  IconKey,
+  IconPower,
+  IconRoute,
+  IconSend,
+  IconShuffle,
+  IconSparkles,
+  IconZap,
+} from "./icons";
 import { Markdown } from "./Markdown";
+import { Badge, Callout, Card, EmptyState, Kbd, Skeleton, Switch, type Tone } from "./ui";
 
 const EXAMPLES = [
   { label: "Quick fact", prompt: "What is the capital of Australia? Answer in one sentence." },
@@ -46,9 +68,14 @@ const CONTINUE: Message = {
   content: "Continue exactly where you stopped. Do not repeat anything you already wrote.",
 };
 
+type Notice = { tone: "info" | "ok" | "bad"; text: string };
+
+const errorText = (e: unknown) => (e instanceof ApiError ? e.message : String(e));
+
 export function Playground() {
   const [key, setKey] = useStored("gw.key", "");
   const [models, setModels] = useState<ModelInfo[]>([]);
+  const [modelsState, setModelsState] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [model, setModel] = useStored("gw.model", "auto");
   const [prompt, setPrompt] = useState(EXAMPLES[0]!.prompt);
   const [stream, setStream] = useState(true);
@@ -57,19 +84,28 @@ export function Playground() {
   const [concise, setConcise] = useState(true);
   const [down, setDown] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [demoBusy, setDemoBusy] = useState(false);
+  const [notice, setNotice] = useState<Notice | null>(null);
   const [live, setLive] = useState<{ text: string; reasoning: string }>({ text: "", reasoning: "" });
   const [runs, setRuns] = useState<Run[]>([]);
 
   useEffect(() => {
-    if (!key) return;
+    if (!key) {
+      setModelsState("idle");
+      return;
+    }
+    setModelsState("loading");
     listModels(key)
       .then((list) => {
         setModels(list);
+        setModelsState("ready");
         if (!list.some((m) => m.id === model) && list[0]) setModel(list[0].id);
-        setNotice(null);
+        setNotice((n) => (n?.tone === "bad" ? null : n));
       })
-      .catch((e: unknown) => setNotice(e instanceof ApiError ? e.message : String(e)));
+      .catch((e: unknown) => {
+        setModelsState("error");
+        setNotice({ tone: "bad", text: errorText(e) });
+      });
   }, [key]);
 
   const providers = useMemo(
@@ -79,14 +115,18 @@ export function Playground() {
   const last = runs[0];
 
   async function getDemoKey() {
+    setDemoBusy(true);
     try {
       const demo = await createDemoKey();
       setKey(demo.key);
-      setNotice(
-        `Demo key created: ${demo.rpm_limit} requests/min, ${usd(demo.monthly_spend_cap_usd)} spend cap.`,
-      );
+      setNotice({
+        tone: "ok",
+        text: `Demo key created: ${demo.rpm_limit} requests/min, ${usd(demo.monthly_spend_cap_usd)} spend cap.`,
+      });
     } catch (e) {
-      setNotice(e instanceof ApiError ? e.message : String(e));
+      setNotice({ tone: "bad", text: errorText(e) });
+    } finally {
+      setDemoBusy(false);
     }
   }
 
@@ -116,7 +156,7 @@ export function Playground() {
         [{ ...result, id: Date.now(), requested: model, prompt, messages }, ...prev].slice(0, 8),
       );
     } catch (e) {
-      setNotice(String(e));
+      setNotice({ tone: "bad", text: String(e) });
     } finally {
       setBusy(false);
     }
@@ -153,7 +193,7 @@ export function Playground() {
       };
       setRuns((prev) => prev.map((r) => (r.id === run.id ? merged : r)));
     } catch (e) {
-      setNotice(String(e));
+      setNotice({ tone: "bad", text: String(e) });
     } finally {
       setBusy(false);
     }
@@ -164,270 +204,615 @@ export function Playground() {
 
   return (
     <div className="playground">
-      <section className="panel compose">
-        <div className="field">
-          <label htmlFor="key">API key</label>
-          <div className="row">
-            <input
-              id="key"
-              type="password"
-              placeholder="gw-…"
-              value={key}
-              onChange={(e) => setKey(e.target.value.trim())}
-              autoComplete="off"
-            />
-            <button className="secondary" onClick={getDemoKey}>
-              Get demo key
-            </button>
-          </div>
+      <div className="page-head playground__head">
+        <div>
+          <h1 className="page-title">Playground</h1>
+          <p className="page-sub">
+            Send OpenAI-format requests through the gateway and see exactly how each one was routed,
+            cached, failed over and billed.
+          </p>
         </div>
+      </div>
 
-        <div className="field">
-          <label htmlFor="model">Model</label>
-          <select id="model" value={model} onChange={(e) => setModel(e.target.value)}>
-            {models.length === 0 && <option value={model}>{model}</option>}
-            {models.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.id === "auto" ? "auto — smart routing" : `${m.id}  ·  ${m.owned_by}`}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="field">
-          <div className="label-row">
-            <label htmlFor="prompt">Prompt</label>
-            <div className="chips">
-              {EXAMPLES.map((ex) => (
-                <button key={ex.label} className="chip" onClick={() => setPrompt(ex.prompt)}>
-                  {ex.label}
-                </button>
-              ))}
-            </div>
-          </div>
-          <textarea
-            id="prompt"
-            rows={5}
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void send();
-            }}
+      <Card className="compose" title="Request" icon={<IconSparkles />}>
+        <form
+          className="compose__form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void send();
+          }}
+        >
+          <KeyField
+            value={key}
+            onChange={setKey}
+            onDemo={() => void getDemoKey()}
+            demoBusy={demoBusy}
+            modelsState={modelsState}
+            modelCount={models.length}
           />
-        </div>
 
-        <div className="options">
-          <label className="toggle">
-            <input type="checkbox" checked={stream} onChange={(e) => setStream(e.target.checked)} />
-            Stream
-          </label>
-          <label className="toggle" title="temperature 0: identical requests are served from the cache">
-            <input
-              type="checkbox"
-              checked={deterministic}
-              onChange={(e) => setDeterministic(e.target.checked)}
-            />
-            Cacheable (temperature 0)
-          </label>
-          <label
-            className="toggle"
-            title="Adds a visible system message telling the model its length budget"
-          >
-            <input type="checkbox" checked={concise} onChange={(e) => setConcise(e.target.checked)} />
-            Concise (fit the limit)
-          </label>
-          <label className="toggle">
-            Max tokens
-            <input
-              type="number"
-              min={16}
-              max={4096}
-              step={16}
-              value={maxTokens}
-              onChange={(e) => setMaxTokens(Number(e.target.value))}
-            />
-          </label>
-        </div>
-
-        {providers.length > 0 && (
           <div className="field">
-            <label>Simulate an outage (this request only)</label>
-            <div className="chips">
-              {providers.map((p) => (
-                <button
-                  key={p}
-                  className={`chip ${down.includes(p) ? "chip-danger" : ""}`}
-                  onClick={() => toggleDown(p)}
-                  aria-pressed={down.includes(p)}
-                >
-                  {down.includes(p) ? "✕ " : ""}
-                  {p}
-                </button>
-              ))}
+            <label className="field__label" htmlFor="model">
+              Model
+            </label>
+            <div className="select">
+              <select id="model" value={model} onChange={(e) => setModel(e.target.value)}>
+                {models.length === 0 && <option value={model}>{model}</option>}
+                {models.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.id === "auto" ? "auto — smart routing" : `${m.id}  ·  ${m.owned_by}`}
+                  </option>
+                ))}
+              </select>
             </div>
+            {model === "auto" && (
+              <p className="field__hint">
+                A classifier picks a cheap or strong model per prompt. No LLM call on the hot path.
+              </p>
+            )}
           </div>
-        )}
 
-        <div className="actions">
-          <button className="primary" onClick={() => void send()} disabled={!key || busy}>
-            {busy ? "Running…" : "Send"}
-          </button>
-          <span className="hint">Ctrl + Enter</span>
-        </div>
-        {notice && <p className="notice">{notice}</p>}
-      </section>
+          <div className="field">
+            <div className="field__row">
+              <label className="field__label" htmlFor="prompt">
+                Prompt
+              </label>
+              <div className="chips" role="group" aria-label="Example prompts">
+                {EXAMPLES.map((ex) => (
+                  <button
+                    type="button"
+                    key={ex.label}
+                    className={`chip ${prompt === ex.prompt ? "is-active" : ""}`}
+                    onClick={() => setPrompt(ex.prompt)}
+                  >
+                    {ex.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <textarea
+              id="prompt"
+              rows={5}
+              value={prompt}
+              placeholder="Ask anything…"
+              onChange={(e) => setPrompt(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                  e.preventDefault();
+                  void send();
+                }
+              }}
+            />
+          </div>
 
-      <section className="panel result">
-        <ResultView live={live} busy={busy} run={last} onContinue={continueRun} />
+          <fieldset className="fieldset">
+            <legend className="field__label">Options</legend>
+            <div className="switch-list">
+              <Switch checked={stream} onChange={setStream} label="Stream" hint="Server-sent events" />
+              <Switch
+                checked={deterministic}
+                onChange={setDeterministic}
+                label="Cacheable"
+                hint="temperature 0, identical requests hit the cache"
+              />
+              <Switch
+                checked={concise}
+                onChange={setConcise}
+                label="Concise"
+                hint="adds a system message with the length budget"
+              />
+              <div className="switch">
+                <span className="switch__text">
+                  <label className="switch__label" htmlFor="max-tokens">
+                    Max tokens
+                  </label>
+                  <span className="switch__hint">answers past this are cut off</span>
+                </span>
+                <input
+                  id="max-tokens"
+                  className="input input--num"
+                  type="number"
+                  min={16}
+                  max={4096}
+                  step={16}
+                  value={maxTokens}
+                  onChange={(e) => setMaxTokens(Number(e.target.value))}
+                />
+              </div>
+            </div>
+          </fieldset>
+
+          {providers.length > 0 && (
+            <fieldset className="fieldset">
+              <legend className="field__label">Simulate an outage</legend>
+              <p className="field__hint">
+                Marks providers as down for this request only, so you can watch it fail over.
+              </p>
+              <div className="chips">
+                {providers.map((p) => {
+                  const off = down.includes(p);
+                  return (
+                    <button
+                      type="button"
+                      key={p}
+                      className={`chip chip--toggle ${off ? "is-down" : ""}`}
+                      onClick={() => toggleDown(p)}
+                      aria-pressed={off}
+                      aria-label={`${p}: ${off ? "simulated down" : "up"}`}
+                    >
+                      <IconPower size={12} />
+                      {p}
+                    </button>
+                  );
+                })}
+              </div>
+            </fieldset>
+          )}
+
+          <div className="compose__actions">
+            <button className="btn btn--primary btn--lg btn--block" type="submit" disabled={!key || busy}>
+              {busy ? <span className="spinner" aria-hidden="true" /> : <IconSend />}
+              {busy ? "Running…" : "Send request"}
+            </button>
+            <span className="compose__hint">
+              <Kbd>Ctrl</Kbd> <Kbd>Enter</Kbd>
+            </span>
+          </div>
+          {!key && (
+            <p className="field__hint compose__nokey">Get a demo key or paste one to send a request.</p>
+          )}
+          {notice && (
+            <Callout tone={notice.tone} onDismiss={() => setNotice(null)}>
+              {notice.text}
+            </Callout>
+          )}
+        </form>
+      </Card>
+
+      <div className="results">
+        <ResultCard live={live} busy={busy} run={last} requested={model} onContinue={continueRun} />
         {runs.length > 1 && <History runs={runs.slice(1)} />}
-      </section>
+      </div>
     </div>
   );
 }
 
-function ResultView({
+function KeyField({
+  value,
+  onChange,
+  onDemo,
+  demoBusy,
+  modelsState,
+  modelCount,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  onDemo: () => void;
+  demoBusy: boolean;
+  modelsState: "idle" | "loading" | "ready" | "error";
+  modelCount: number;
+}) {
+  const [show, setShow] = useState(false);
+  return (
+    <div className="field">
+      <div className="field__row">
+        <label className="field__label" htmlFor="key">
+          API key
+        </label>
+        <KeyStatus state={modelsState} count={modelCount} />
+      </div>
+      <div className="key-row">
+        <div className="input-group">
+          <IconKey className="icon input-group__icon" />
+          <input
+            id="key"
+            className="input input--mono"
+            type={show ? "text" : "password"}
+            placeholder="gw-…"
+            value={value}
+            onChange={(e) => onChange(e.target.value.trim())}
+            autoComplete="off"
+            spellCheck={false}
+          />
+          <button
+            type="button"
+            className="icon-btn input-group__btn"
+            onClick={() => setShow(!show)}
+            aria-label={show ? "Hide key" : "Show key"}
+            aria-pressed={show}
+          >
+            {show ? <IconEyeOff /> : <IconEye />}
+          </button>
+        </div>
+        <button type="button" className="btn btn--secondary" onClick={onDemo} disabled={demoBusy}>
+          {demoBusy ? <span className="spinner" aria-hidden="true" /> : <IconZap />}
+          Get demo key
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function KeyStatus({ state, count: n }: { state: "idle" | "loading" | "ready" | "error"; count: number }) {
+  if (state === "loading") return <span className="key-status">Checking…</span>;
+  if (state === "ready")
+    return (
+      <span className="key-status key-status--ok">
+        <span className="status-dot status-dot--ok" aria-hidden="true" /> Connected · {n} models
+      </span>
+    );
+  if (state === "error")
+    return (
+      <span className="key-status key-status--bad">
+        <span className="status-dot status-dot--bad" aria-hidden="true" /> Key rejected
+      </span>
+    );
+  return null;
+}
+
+function ResultCard({
   live,
   busy,
   run,
+  requested,
   onContinue,
 }: {
   live: { text: string; reasoning: string };
   busy: boolean;
   run: Run | undefined;
+  requested: string;
   onContinue: (run: Run) => void;
 }) {
   const text = busy ? live.text : (run?.text ?? "");
   const reasoning = busy ? live.reasoning : (run?.reasoning ?? "");
-  if (!busy && !run) {
-    return (
-      <div className="empty">
-        <h3>Send a request</h3>
-        <p>
-          Try <code>auto</code> to watch the router pick a model, tick <em>Cacheable</em> and send
-          twice to see a cache hit, or simulate an outage to watch the request fail over.
-        </p>
-      </div>
-    );
-  }
+  const status = busy ? (
+    <Badge tone="accent" dot>
+      {text || reasoning ? "Streaming" : "Waiting for first token"}
+    </Badge>
+  ) : run ? (
+    <Badge tone={run.ok ? "ok" : "bad"} dot>
+      {run.status} {run.ok ? "OK" : "Error"}
+    </Badge>
+  ) : null;
+
   return (
-    <>
-      {run && !busy && <Meta run={run} />}
-      {run?.error && !busy && <div className="error-box">{run.error}</div>}
-      {reasoning && (
-        <details className="reasoning">
-          <summary>Reasoning</summary>
-          <p>{reasoning}</p>
-        </details>
-      )}
-      <div className={`answer ${busy ? "streaming" : ""}`}>
-        {text ? <Markdown text={text} /> : busy ? "…" : ""}
-      </div>
-      {run && !busy && run.finishReason === "length" && (
-        <div className="warn-box">
-          <span>
-            The answer was cut off at the <strong>max tokens</strong> limit. Continue it, or raise
-            Max tokens / turn on Concise and send again.
-          </span>
-          <button className="secondary" onClick={() => onContinue(run)}>
-            Continue
-          </button>
+    <Card
+      className="result"
+      title="Response"
+      icon={<IconArrowRight />}
+      actions={
+        <>
+          {run?.requestId && !busy && (
+            <code className="request-id" title="X-Gateway-Request-Id">
+              {run.requestId.slice(0, 8)}
+            </code>
+          )}
+          {status}
+        </>
+      }
+    >
+      {!busy && !run ? (
+        <EmptyState icon={<IconSparkles size={20} />} title="Send a request to see it here">
+          <ul className="tips">
+            <li>
+              Pick <code>auto</code> to watch the router choose a model and explain why.
+            </li>
+            <li>
+              Keep <strong>Cacheable</strong> on and send twice to get an instant, free cache hit.
+            </li>
+            <li>Simulate an outage to watch the request fail over to the next provider.</li>
+          </ul>
+        </EmptyState>
+      ) : (
+        <div className="result__body" aria-busy={busy}>
+          {busy ? <SummarySkeleton requested={requested} /> : run && <Summary run={run} />}
+          {run?.error && !busy && <Callout tone="bad" title="Request failed">{run.error}</Callout>}
+          {reasoning && (
+            <details className="reasoning">
+              <summary>
+                <IconSparkles size={14} /> Reasoning
+                <span className="reasoning__count">{count(reasoning.length)} chars</span>
+              </summary>
+              <p>{reasoning}</p>
+            </details>
+          )}
+          <div className={`answer ${busy ? "is-streaming" : ""}`} aria-live={busy ? "off" : "polite"}>
+            {text ? (
+              <Markdown text={text} />
+            ) : busy ? (
+              <div className="answer__placeholder">
+                <Skeleton width="92%" />
+                <Skeleton width="78%" />
+                <Skeleton width="64%" />
+              </div>
+            ) : run?.ok ? (
+              <p className="muted">The model returned an empty answer.</p>
+            ) : null}
+          </div>
+          {run && !busy && run.finishReason === "length" && (
+            <Callout
+              tone="warn"
+              title="Cut off at the max tokens limit"
+              action={
+                <button type="button" className="btn btn--secondary btn--sm" onClick={() => onContinue(run)}>
+                  Continue
+                </button>
+              }
+            >
+              Continue the answer, or raise Max tokens / turn on Concise and send again.
+            </Callout>
+          )}
         </div>
       )}
-    </>
+    </Card>
   );
 }
 
-function Meta({ run }: { run: Run }) {
-  const routed = run.route !== undefined;
+function SummarySkeleton({ requested }: { requested: string }) {
   return (
-    <div className="meta">
-      {routed && (
-        <Tile label="Route">
-          <span className={`badge ${run.route === "cheap" ? "badge-green" : "badge-purple"}`}>
-            {run.route}
-          </span>
-          <small>
-            {run.routeReason}
-            {run.routeProbability !== undefined && ` · P(cheap ok) ${run.routeProbability.toFixed(2)}`}
-          </small>
-        </Tile>
-      )}
-      <Tile label="Served by">
-        <strong>{run.alias ?? "—"}</strong>
-        <small>
-          {run.provider} · {run.model}
-        </small>
-      </Tile>
-      <Tile label="Failover">
-        <strong>{run.fallbacks > 0 ? `${run.fallbacks} fallback${run.fallbacks > 1 ? "s" : ""}` : "none"}</strong>
-        <small>{run.attempts} upstream attempt{run.attempts === 1 ? "" : "s"}</small>
-      </Tile>
-      <Tile label="Cache">
-        <span className={`badge ${run.cache === "HIT" ? "badge-green" : "badge-gray"}`}>
-          {run.cache ?? "—"}
-        </span>
-      </Tile>
-      <Tile label="Cost">
-        <strong>{usd(run.costUsd)}</strong>
-        <small>
-          {run.promptTokens ?? "?"} in · {run.completionTokens ?? "?"} out
-        </small>
-      </Tile>
-      <Tile label="Latency">
-        <strong>{ms(run.totalMs)}</strong>
-        <small>
-          {run.ttftMs !== undefined && `first token ${ms(run.ttftMs)} · `}
-          gateway {ms(run.overheadMs)}
-        </small>
-      </Tile>
-      <Tile label="Status">
-        <span className={`badge ${run.ok ? "badge-green" : "badge-red"}`}>{run.status}</span>
-        {run.finishReason && (
-          <small>{run.finishReason === "length" ? "cut off (max tokens)" : run.finishReason}</small>
-        )}
-      </Tile>
+    <div className="summary" aria-hidden="true">
+      <div className="served">
+        <div className="served__main">
+          <span className="eyebrow">Requested</span>
+          <span className="served__alias">{requested}</span>
+          <Skeleton width={180} height={10} />
+        </div>
+      </div>
+      <div className="metrics">
+        {Array.from({ length: 6 }, (_, i) => (
+          <div className="metric" key={i}>
+            <Skeleton width="50%" height={9} />
+            <Skeleton width="70%" height={16} />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
 
-function Tile({ label, children }: { label: string; children: React.ReactNode }) {
+const ROUTE_TONE: Record<string, Tone> = { cheap: "ok", strong: "purple" };
+
+function Summary({ run }: { run: Run }) {
+  const routed = run.route !== undefined;
+  const cacheHit = run.cache === "HIT";
   return (
-    <div className="tile">
-      <span className="tile-label">{label}</span>
-      <div className="tile-body">{children}</div>
+    <div className="summary">
+      <div className="served">
+        <div className="served__main">
+          <span className="eyebrow">Answered by</span>
+          <span className="served__alias" title="X-Gateway-Alias">
+            {run.alias ?? "—"}
+          </span>
+          <span className="served__sub">
+            {run.provider ?? "unknown provider"}
+            {run.model && (
+              <>
+                <span aria-hidden="true"> · </span>
+                <code>{run.model}</code>
+              </>
+            )}
+            {run.requested !== run.alias && (
+              <>
+                <span aria-hidden="true"> · </span>requested <code>{run.requested}</code>
+              </>
+            )}
+          </span>
+        </div>
+        {routed && (
+          <div className="route" title="Smart routing decision (X-Gateway-Route)">
+            <span className="eyebrow">
+              <IconRoute size={12} /> Route
+            </span>
+            <div className="route__line">
+              <Badge tone={ROUTE_TONE[run.route ?? ""] ?? "accent"}>{run.route}</Badge>
+              {run.routeProbability !== undefined && (
+                <span className="route__prob">
+                  P(cheap ok) <strong>{run.routeProbability.toFixed(2)}</strong>
+                </span>
+              )}
+            </div>
+            {run.routeProbability !== undefined && (
+              <span className="prob-bar" aria-hidden="true">
+                <span style={{ width: `${Math.max(0, Math.min(1, run.routeProbability)) * 100}%` }} />
+              </span>
+            )}
+            {run.routeReason && <span className="route__reason">{run.routeReason}</span>}
+          </div>
+        )}
+      </div>
+
+      {run.distill && <DistillIndicator info={run.distill} />}
+
+      <dl className="metrics">
+        <Metric icon={<IconClock />} label="Total latency" value={ms(run.totalMs)} />
+        <Metric
+          icon={<IconZap />}
+          label="First token"
+          value={ms(run.ttftMs)}
+          sub={run.ttftMs === undefined ? "non-streamed" : undefined}
+        />
+        <Metric icon={<IconGauge />} label="Gateway overhead" value={ms(run.overheadMs)} sub="Server-Timing" />
+        <Metric
+          icon={<IconCoins />}
+          label="Cost"
+          value={usd(run.costUsd)}
+          sub={cacheHit ? "free (cache hit)" : undefined}
+        />
+        <Metric
+          icon={<IconHash />}
+          label="Tokens"
+          value={`${run.promptTokens ?? "?"} → ${run.completionTokens ?? "?"}`}
+          sub="prompt → completion"
+        />
+        <Metric
+          icon={<IconDatabase />}
+          label="Cache"
+          value={<Badge tone={cacheHit ? "ok" : "neutral"}>{run.cache ?? "—"}</Badge>}
+        />
+        <Metric
+          icon={<IconShuffle />}
+          label="Failover"
+          value={
+            run.fallbacks > 0 ? (
+              <Badge tone="warn">
+                {run.fallbacks} fallback{run.fallbacks > 1 ? "s" : ""}
+              </Badge>
+            ) : (
+              "None"
+            )
+          }
+          sub={`${run.attempts} upstream attempt${run.attempts === 1 ? "" : "s"}`}
+        />
+        <Metric
+          icon={<IconAlert />}
+          label="Status"
+          value={
+            <Badge tone={run.ok ? "ok" : "bad"}>
+              {run.status}
+            </Badge>
+          }
+          sub={
+            run.finishReason
+              ? run.finishReason === "length"
+                ? "cut off (max tokens)"
+                : `finish: ${run.finishReason}`
+              : undefined
+          }
+        />
+      </dl>
+    </div>
+  );
+}
+
+function Metric({
+  icon,
+  label,
+  value,
+  sub,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: React.ReactNode;
+  sub?: string;
+}) {
+  return (
+    <div className="metric">
+      <dt className="metric__label">
+        {icon}
+        {label}
+      </dt>
+      <dd className="metric__value">{value}</dd>
+      {sub && <dd className="metric__sub">{sub}</dd>}
+    </div>
+  );
+}
+
+const DISTILL_COPY: Record<string, { tone: Tone; title: string; detail: string }> = {
+  served: {
+    tone: "ok",
+    title: "Served by distilled model",
+    detail: "A small fine-tuned model answered and passed validation.",
+  },
+  distilled: {
+    tone: "ok",
+    title: "Routed to distilled model",
+    detail: "This request was sent to the small fine-tuned model for its task.",
+  },
+  fallback: {
+    tone: "warn",
+    title: "Fallback to strong model",
+    detail: "The distilled model's answer failed validation, so the source model answered instead.",
+  },
+  shadow: {
+    tone: "purple",
+    title: "Shadow comparison",
+    detail: "The source model answered; the distilled model ran in the background for evaluation.",
+  },
+};
+
+function distillCopy(info: DistillInfo) {
+  return (
+    DISTILL_COPY[info.outcome] ?? {
+      tone: "accent" as Tone,
+      title: `Distilled model · ${info.outcome}`,
+      detail: "A distilled model took part in this request.",
+    }
+  );
+}
+
+function DistillIndicator({ info }: { info: DistillInfo }) {
+  const copy = distillCopy(info);
+  return (
+    <div className={`distill-flag distill-flag--${copy.tone}`} role="note" title="X-Gateway-Distill">
+      <span className="distill-flag__icon">
+        <IconFlask />
+      </span>
+      <div className="distill-flag__text">
+        <span className="distill-flag__title">
+          {copy.title}
+          <span className="distill-flag__task">
+            <code>{info.task}</code>
+          </span>
+        </span>
+        <span className="distill-flag__detail">{copy.detail}</span>
+      </div>
+      <Badge tone={copy.tone}>{info.outcome}</Badge>
     </div>
   );
 }
 
 function History({ runs }: { runs: Run[] }) {
   return (
-    <div className="history">
-      <h4>Earlier runs</h4>
-      <table>
-        <thead>
-          <tr>
-            <th>Model</th>
-            <th>Served by</th>
-            <th>Cache</th>
-            <th className="num">Latency</th>
-            <th className="num">Cost</th>
-          </tr>
-        </thead>
-        <tbody>
-          {runs.map((r) => (
-            <tr key={r.id} title={r.prompt}>
-              <td>{r.requested}</td>
-              <td>
-                {r.alias ?? "—"}
-                {r.fallbacks > 0 && <span className="badge badge-amber">failover</span>}
-              </td>
-              <td>{r.cache ?? "—"}</td>
-              <td className="num">{ms(r.totalMs)}</td>
-              <td className="num">{usd(r.costUsd)}</td>
+    <Card title="Earlier runs" icon={<IconHistory />} flush description="This session only, newest first.">
+      <div className="table-wrap">
+        <table className="table">
+          <thead>
+            <tr>
+              <th scope="col">Prompt</th>
+              <th scope="col">Requested</th>
+              <th scope="col">Answered by</th>
+              <th scope="col">Cache</th>
+              <th scope="col" className="num">
+                Latency
+              </th>
+              <th scope="col" className="num">
+                Cost
+              </th>
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody>
+            {runs.map((r) => (
+              <tr key={r.id}>
+                <td className="cell-truncate" title={r.prompt}>
+                  {r.prompt}
+                </td>
+                <td>
+                  <code className="code-pill">{r.requested}</code>
+                </td>
+                <td>
+                  <div className="cell-stack">
+                    <span className="cell-strong">{r.alias ?? "—"}</span>
+                    <span className="cell-badges">
+                      {!r.ok && <Badge tone="bad">{r.status}</Badge>}
+                      {r.fallbacks > 0 && <Badge tone="warn">failover</Badge>}
+                      {r.distill && (
+                        <Badge tone={distillCopy(r.distill).tone} title={distillCopy(r.distill).title}>
+                          distill · {r.distill.outcome}
+                        </Badge>
+                      )}
+                    </span>
+                  </div>
+                </td>
+                <td>
+                  <Badge tone={r.cache === "HIT" ? "ok" : "neutral"}>{r.cache ?? "—"}</Badge>
+                </td>
+                <td className="num">{ms(r.totalMs)}</td>
+                <td className="num">{usd(r.costUsd)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Card>
   );
 }

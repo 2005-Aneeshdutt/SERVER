@@ -1,4 +1,5 @@
 import { Fragment, type ReactNode } from "react";
+import { CopyButton } from "./ui";
 
 /**
  * Minimal, safe Markdown: fenced code, headings, lists, paragraphs, `code` and **bold**.
@@ -11,11 +12,17 @@ export function Markdown({ text }: { text: string }) {
   for (const match of text.matchAll(fence)) {
     const start = match.index ?? 0;
     if (start > last) parts.push(<Blocks key={`t${last}`} text={text.slice(last, start)} />);
+    const code = match[2]?.replace(/\n$/, "") ?? "";
     parts.push(
-      <pre key={`c${start}`} className="code">
-        {match[1] && <span className="code-lang">{match[1]}</span>}
-        <code>{match[2]?.replace(/\n$/, "")}</code>
-      </pre>,
+      <figure key={`c${start}`} className="codeblock">
+        <figcaption className="codeblock__bar">
+          <span className="codeblock__lang">{match[1] || "text"}</span>
+          <CopyButton text={code} />
+        </figcaption>
+        <pre className="code">
+          <code>{code}</code>
+        </pre>
+      </figure>,
     );
     last = start + match[0].length;
   }

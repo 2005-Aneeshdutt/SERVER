@@ -100,6 +100,27 @@ export interface ChatResult {
   promptTokens?: number;
   completionTokens?: number;
   requestId?: string;
+  /** Set when a distilled (small fine-tuned) model took part, from X-Gateway-Distill. */
+  distill?: DistillInfo;
+}
+
+/** Outcome of the distilled-model rollout for one request. */
+export type DistillOutcome = "served" | "fallback" | "shadow" | "distilled";
+
+export interface DistillInfo {
+  task: string;
+  /** Usually a DistillOutcome; kept as string so a new server value still displays. */
+  outcome: DistillOutcome | (string & {});
+}
+
+/** Parse `X-Gateway-Distill: "<task>; <outcome>"`. */
+export function parseDistill(value: string | null): DistillInfo | undefined {
+  if (!value) return undefined;
+  const cut = value.lastIndexOf(";");
+  if (cut < 0) return { task: value.trim(), outcome: "distilled" };
+  const task = value.slice(0, cut).trim();
+  const outcome = value.slice(cut + 1).trim().toLowerCase();
+  return task ? { task, outcome: outcome || "distilled" } : undefined;
 }
 
 interface Delta {
@@ -141,6 +162,7 @@ function fromHeaders(res: Response): Partial<ChatResult> {
     costUsd: num("x-gateway-cost-usd"),
     overheadMs: overhead === undefined ? undefined : Number(overhead),
     requestId: h.get("x-gateway-request-id") ?? undefined,
+    distill: parseDistill(h.get("x-gateway-distill")),
   };
 }
 
@@ -376,3 +398,49 @@ export const setKeyActive = (token: string, id: string, active: boolean) =>
     headers: json(token),
     body: JSON.stringify({ active }),
   });
+
+// ---- distilled-model rollout ----------------------------------------------------------------
+
+export interface DistillTask {
+  task: string;
+  system_fingerprint: string;
+  source_alias: string;
+  distilled_alias: string;
+  version: string;
+  state: string;
+  weight: number;
+  shadow_n: number;
+  shadow_valid: number;
+  shadow_agree: number;
+  window_n: number;
+  window_failures: number;
+}
+
+export interface DistillAuditEvent {
+  ts: string;
+  task: string;
+  action: string;
+  state: string;
+  weight: number;
+  actor: string;
+  reason: string;
+}
+
+/**
+ * null when the rollout isn't available on this gateway, so the panel can hide: 503 when the
+ * feature is disabled, 404 when the gateway build predates the endpoints.
+ */
+export async function getDistill(
+  token: string,
+): Promise<{ tasks: DistillTask[]; audit: DistillAuditEvent[] } | null> {
+  try {
+    const [tasks, audit] = await Promise.all([
+      request<DistillTask[]>("/admin/distill/tasks", { headers: bearer(token) }),
+      request<DistillAuditEvent[]>("/admin/distill/audit?limit=8", { headers: bearer(token) }),
+    ]);
+    return { tasks, audit };
+  } catch (e) {
+    if (e instanceof ApiError && (e.status === 503 || e.status === 404)) return null;
+    throw e;
+  }
+}
