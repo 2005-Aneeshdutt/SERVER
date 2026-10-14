@@ -62,14 +62,18 @@ TARGETS = {
 }
 
 
-def prepare(n: int, seed: int) -> None:
-    write(banking77.TASK, banking77.load(n, seed))
-    examples, tables = wikisql.load(n, seed)
-    write(wikisql.TASK, examples)
-    wikisql.save_tables(tables, TASKS / "wikisql_tables.jsonl")
-    write(fewnerd.TASK, fewnerd.load(n, seed))
-    write(noise.TASK, noise.load(n * 2))
-    for task in TASK_NAMES:
+def prepare(n: int, seed: int, tasks: list[str]) -> None:
+    if banking77.TASK in tasks:
+        write(banking77.TASK, banking77.load(n, seed))
+    if wikisql.TASK in tasks:
+        examples, tables = wikisql.load(n, seed)
+        write(wikisql.TASK, examples)
+        wikisql.save_tables(tables, TASKS / "wikisql_tables.jsonl")
+    if fewnerd.TASK in tasks:
+        write(fewnerd.TASK, fewnerd.load(n, seed))
+    if noise.TASK in tasks:
+        write(noise.TASK, noise.load(n * 2))
+    for task in tasks:
         print(f"{task}: {len(read(task))} examples -> {TASKS / f'{task}.jsonl'}")
 
 
@@ -183,6 +187,7 @@ def main() -> None:
     p = sub.add_parser("prepare", help="download datasets and write data/tasks/*.jsonl")
     p.add_argument("--n", type=int, default=300, help="examples per task")
     p.add_argument("--seed", type=int, default=7)
+    p.add_argument("--tasks", default=",".join(TASK_NAMES))
     k = sub.add_parser("key", help="create the simulated, opted-in replay key")
     k.add_argument("--gateway", default="http://localhost:8000")
     r = sub.add_parser("run", help="send traffic through the gateway (resumable)")
@@ -193,7 +198,7 @@ def main() -> None:
     args = parser.parse_args()
     REPLAY.mkdir(parents=True, exist_ok=True)
     if args.cmd == "prepare":
-        prepare(args.n, args.seed)
+        prepare(args.n, args.seed, args.tasks.split(","))
     elif args.cmd == "key":
         create_key(args.gateway)
     else:

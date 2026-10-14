@@ -32,6 +32,9 @@ def features(dataset: str, config: str, split: str) -> list[dict[str, Any]]:
         return result
 
 
+FULL_SCAN_ROWS = 20_000
+
+
 def sample_rows(
     dataset: str,
     config: str,
@@ -40,11 +43,24 @@ def sample_rows(
     seed: int,
     keep: Callable[[dict[str, Any]], bool] = lambda _: True,
 ) -> Iterator[dict[str, Any]]:
-    """Yield up to n rows passing `keep`, reading pages at random (seeded) offsets."""
+    """Yield up to n rows passing `keep`, in a seeded random order.
+
+    Datasets up to FULL_SCAN_ROWS are read completely and shuffled as a whole. Bigger ones are
+    sampled page by page at random offsets, which is only a fair sample when rows aren't
+    sorted: Banking77's train split is sorted by label, and page sampling once produced
+    "traffic" covering only 23 of its 77 intents (see distill/RESULTS.md).
+    """
     rng = random.Random(seed)
     with httpx.Client() as client:
         total = int(_page(client, dataset, config, split, 0)["num_rows_total"])
         offsets = list(range(0, total, PAGE))
+        if total <= FULL_SCAN_ROWS:
+            rows = [
+                r["row"] for o in offsets for r in _page(client, dataset, config, split, o)["rows"]
+            ]
+            rng.shuffle(rows)
+            yield from [r for r in rows if keep(r)][:n]
+            return
         rng.shuffle(offsets)
         produced = 0
         for offset in offsets:
