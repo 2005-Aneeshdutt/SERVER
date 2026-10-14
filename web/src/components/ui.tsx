@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useAnimatedNumber } from "../hooks";
 import { IconAlert, IconCheck, IconCopy, IconInfo, IconX } from "./icons";
 
 /** Semantic tones shared by badges, dots, callouts and meters. */
@@ -253,5 +254,28 @@ export function Meter({ value, tone = "accent", label }: { value: number | null;
     >
       <span className="meter__fill" style={{ width: `${v * 100}%` }} />
     </span>
+  );
+}
+
+/** A number that eases to each new value (snaps under prefers-reduced-motion). */
+export function Ticker({ value, format }: { value: number | null | undefined; format: (v: number) => string }) {
+  const shown = useAnimatedNumber(value ?? null);
+  return <span className="ticker">{shown === null ? "—" : format(shown)}</span>;
+}
+
+/** Minimal area sparkline; scales to its container width. */
+export function Sparkline({ values, tone = "accent", label }: { values: number[]; tone?: Tone; label: string }) {
+  const w = 120;
+  const h = 32;
+  if (values.length < 2) return <span className="sparkline sparkline--empty" aria-hidden="true" />;
+  const max = Math.max(...values, 1e-9);
+  const step = w / (values.length - 1);
+  const pts = values.map((v, i) => [i * step, h - 2 - (v / max) * (h - 4)] as const);
+  const line = pts.map(([x, y], i) => `${i ? "L" : "M"}${x.toFixed(1)} ${y.toFixed(1)}`).join(" ");
+  return (
+    <svg className={`sparkline sparkline--${tone}`} viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" role="img" aria-label={label}>
+      <path d={`${line} L${w} ${h} L0 ${h} Z`} className="sparkline__area" />
+      <path d={line} className="sparkline__line" vectorEffect="non-scaling-stroke" />
+    </svg>
   );
 }

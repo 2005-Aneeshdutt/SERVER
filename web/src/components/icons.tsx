@@ -192,3 +192,42 @@ export const IconHistory = make(
     <path d="M3 3v5h5M12 7v5l3 2" />
   </>,
 );
+export const IconSearch = make(
+  <>
+    <circle cx="11" cy="11" r="7" />
+    <path d="m20 20-3.5-3.5" />
+  </>,
+);
+export const IconHome = make(
+  <>
+    <path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1v-9.5Z" />
+  </>,
+);
+export const IconColumns = make(
+  <>
+    <rect x="3" y="4" width="18" height="16" rx="2.5" />
+    <path d="M12 4v16" />
+  </>,
+);
+export const IconCommand = make(
+  <path d="M9 6a3 3 0 1 0-3 3h12a3 3 0 1 0-3-3v12a3 3 0 1 0 3-3H6a3 3 0 1 0 3 3V6Z" />,
+);
+export const IconCpu = make(
+  <>
+    <rect x="6" y="6" width="12" height="12" rx="2" />
+    <path d="M10 10h4v4h-4zM9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4" />
+  </>,
+);
+export const IconShield = make(<path d="M12 3 4 6v6c0 4.5 3.4 8.2 8 9 4.6-.8 8-4.5 8-9V6l-8-3Z" />);
+export const IconBox = make(
+  <>
+    <path d="m21 8-9-5-9 5 9 5 9-5Z" />
+    <path d="M3 8v8l9 5 9-5V8M12 13v8" />
+  </>,
+);
+export const IconTrophy = make(
+  <>
+    <path d="M8 4h8v5a4 4 0 0 1-8 0V4Z" />
+    <path d="M8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M8 21h8M9 17h6" />
+  </>,
+);
