@@ -96,7 +96,12 @@ export interface ChatResult {
   fallbacks: number;
   attempts: number;
   costUsd?: number;
+  /** Time the gateway itself added (Server-Timing gateway;dur). */
   overheadMs?: number;
+  /** Time waiting on the provider up to the first chunk (Server-Timing upstream;dur). */
+  upstreamMs?: number;
+  /** Client-measured time until response headers arrived. */
+  headersMs?: number;
   promptTokens?: number;
   completionTokens?: number;
   requestId?: string;
@@ -148,6 +153,7 @@ function fromHeaders(res: Response): Partial<ChatResult> {
   };
   const timing = h.get("server-timing") ?? "";
   const overhead = /gateway;dur=([\d.]+)/.exec(timing)?.[1];
+  const upstream = /upstream;dur=([\d.]+)/.exec(timing)?.[1];
   return {
     provider: h.get("x-gateway-provider") ?? undefined,
     model: h.get("x-gateway-model") ?? undefined,
@@ -161,6 +167,7 @@ function fromHeaders(res: Response): Partial<ChatResult> {
     attempts: num("x-gateway-attempts") ?? 0,
     costUsd: num("x-gateway-cost-usd"),
     overheadMs: overhead === undefined ? undefined : Number(overhead),
+    upstreamMs: upstream === undefined ? undefined : Number(upstream),
     requestId: h.get("x-gateway-request-id") ?? undefined,
     distill: parseDistill(h.get("x-gateway-distill")),
   };
@@ -190,6 +197,7 @@ export async function chat(
     headers,
     body: JSON.stringify(body),
   });
+  const headersMs = performance.now() - started;
   const result: ChatResult = {
     ok: res.ok,
     status: res.status,
@@ -199,6 +207,7 @@ export async function chat(
     fallbacks: 0,
     attempts: 0,
     ...fromHeaders(res),
+    headersMs,
   };
   if (!res.ok) {
     const err = (await res.json().catch(() => null)) as StreamEvent | null;
@@ -338,6 +347,8 @@ export interface RecentRequest {
   fallback_count: number;
   route: string | null;
   route_probability: number | null;
+  prompt_tokens?: number;
+  completion_tokens?: number;
 }
 
 export const getRecent = (token: string, limit = 25) =>
