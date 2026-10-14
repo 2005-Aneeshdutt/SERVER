@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
   ApiError,
   createKey,
@@ -20,9 +20,11 @@ import {
 } from "../api";
 import { ago, count, ms, pct, time, usd } from "../format";
 import { usePolling, useStored } from "../hooks";
+import { useToast } from "./toast";
 import {
   IconActivity,
   IconAlert,
+  IconCheck,
   IconClock,
   IconCoins,
   IconDatabase,
@@ -34,6 +36,7 @@ import {
   IconPlus,
   IconServer,
   IconShuffle,
+  IconX,
   IconZap,
 } from "./icons";
 import { fillBuckets, TimeChart } from "./TimeChart";
@@ -47,7 +50,9 @@ import {
   Segmented,
   Skeleton,
   SkeletonRows,
+  Sparkline,
   StatusDot,
+  Ticker,
   type Tone,
 } from "./ui";
 
@@ -129,6 +134,7 @@ function Console({ token, onSignOut }: { token: string; onSignOut: () => void })
   const [distill, setDistill] = useState<Distill>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<string | null>(null);
+  const toast = useToast();
 
   const guard = useCallback(
     async (fn: () => Promise<void>) => {
@@ -231,6 +237,11 @@ function Console({ token, onSignOut }: { token: string; onSignOut: () => void })
               try {
                 await setOutage(token, name, down);
                 setProviders(await getProviders(token));
+                toast(
+                  down ? "info" : "ok",
+                  down ? `${name} taken down` : `${name} restored`,
+                  down ? "All traffic now fails over along its fallback chains." : "Back in rotation.",
+                );
               } finally {
                 setPending(null);
               }
@@ -249,6 +260,7 @@ function Console({ token, onSignOut }: { token: string; onSignOut: () => void })
           await guard(async () => {
             raw = (await createKey(token, k)).key;
             setKeys(await listKeys(token));
+            toast("ok", `Key “${k.name}” created`, "Copy it now; it is shown only once.");
           });
           return raw;
         }}
@@ -256,6 +268,11 @@ function Console({ token, onSignOut }: { token: string; onSignOut: () => void })
           guard(async () => {
             await setKeyActive(token, id, active);
             setKeys(await listKeys(token));
+            toast(
+              active ? "ok" : "info",
+              active ? "Key reactivated" : "Key revoked",
+              active ? undefined : "Cached key lookups may still accept it for up to 60 s.",
+            );
           })
         }
       />
@@ -269,28 +286,56 @@ function Kpis({ series, rangeTitle }: { series: Timeseries | null; rangeTitle: s
   const t = series?.totals ?? {};
   const requests = t.requests ?? 0;
   const errorRate = requests ? (t.errors ?? 0) / requests : null;
-  const items: { label: string; value: string; icon: React.ReactNode; sub?: string; tone?: Tone }[] = [
-    { label: "Requests", value: count(t.requests), icon: <IconActivity />, sub: rangeTitle },
-    { label: "Spend", value: usd(t.cost_usd), icon: <IconCoins />, sub: `${count(t.tokens)} tokens` },
+  const hitRate = requests ? (t.cache_hits ?? 0) / requests : null;
+  const int = (v: number) => count(Math.round(v));
+  const items: {
+    label: string;
+    value: number | null;
+    format: (v: number) => string;
+    icon: React.ReactNode;
+    sub?: string;
+    tone?: Tone;
+    spark?: number[];
+  }[] = [
+    {
+      label: "Requests",
+      value: t.requests ?? null,
+      format: int,
+      icon: <IconActivity />,
+      sub: rangeTitle,
+      spark: series?.rows.map((r) => r.requests),
+    },
+    {
+      label: "Spend",
+      value: t.cost_usd === undefined ? null : Number(t.cost_usd),
+      format: (v) => usd(v),
+      icon: <IconCoins />,
+      sub: `${count(t.tokens)} tokens`,
+      spark: series?.rows.map((r) => Number(r.cost_usd)),
+    },
     {
       label: "Cache hit rate",
-      value: requests ? pct((t.cache_hits ?? 0) / requests) : "—",
+      value: hitRate,
+      format: (v) => pct(v),
       icon: <IconDatabase />,
       sub: `${count(t.cache_hits)} hits`,
     },
     {
       label: "Error rate",
-      value: errorRate === null ? "—" : pct(errorRate),
+      value: errorRate,
+      format: (v) => pct(v),
       icon: <IconAlert />,
       sub: `${count(t.errors)} errors`,
       tone: errorRate !== null && errorRate > 0.05 ? "bad" : undefined,
     },
-    { label: "Failovers", value: count(t.fallbacks), icon: <IconShuffle />, sub: "fallback hops" },
+    { label: "Failovers", value: t.fallbacks ?? null, format: int, icon: <IconShuffle />, sub: "fallback hops" },
     {
       label: "Latency p50",
-      value: ms(t.p50_latency_ms),
+      value: t.p50_latency_ms ?? null,
+      format: (v) => ms(v),
       icon: <IconClock />,
       sub: `p95 ${ms(t.p95_latency_ms)}`,
+      spark: series?.rows.map((r) => r.p50_latency_ms ?? 0),
     },
   ];
   return (
@@ -303,8 +348,13 @@ function Kpis({ series, rangeTitle }: { series: Timeseries | null; rangeTitle: s
           </span>
           {series ? (
             <>
-              <strong className="kpi__value">{k.value}</strong>
-              {k.sub && <span className="kpi__sub">{k.sub}</span>}
+              <strong className="kpi__value">
+                <Ticker value={k.value} format={k.format} />
+              </strong>
+              <span className="kpi__foot">
+                {k.sub && <span className="kpi__sub">{k.sub}</span>}
+                {k.spark && <Sparkline values={k.spark} label={`${k.label} trend`} />}
+              </span>
             </>
           ) : (
             <>
@@ -550,27 +600,93 @@ function UsagePanel({ rows, keyNames }: { rows: UsageRow[] | null; keyNames: Map
 // ---- distilled models ---------------------------------------------------------------------
 
 const ROLLOUT: Record<string, [string, Tone]> = {
-  off: ["Off", "neutral"],
+  off: ["Registered", "neutral"],
   shadow: ["Shadow", "purple"],
   canary: ["Canary", "warn"],
   full: ["Full", "ok"],
   rolled_back: ["Rolled back", "bad"],
 };
-const STAGES = ["shadow", "canary", "full"] as const;
 
-function RolloutTrack({ state }: { state: string }) {
-  const reached = STAGES.indexOf(state as (typeof STAGES)[number]);
+const PIPELINE = [
+  { id: "capture", label: "Capture", hint: "via Kafka" },
+  { id: "discover", label: "Discover", hint: "repeated task" },
+  { id: "dataset", label: "Dataset", hint: "strong-model labels" },
+  { id: "train", label: "Train", hint: "small model" },
+  { id: "eval", label: "Eval gate", hint: "offline check" },
+  { id: "shadow", label: "Shadow", hint: "compare in background" },
+  { id: "canary", label: "Canary", hint: "partial traffic" },
+  { id: "full", label: "Full", hint: "all traffic" },
+] as const;
+
+type StepState = "done" | "current" | "todo" | "warn" | "failed";
+
+interface Step {
+  id: string;
+  label: string;
+  caption: string;
+  state: StepState;
+  when?: string;
+}
+
+/** Where a task sits in the pipeline, from its rollout state plus its audit trail (newest first). */
+function pipelineFor(t: DistillTask, audit: DistillAuditEvent[]): Step[] {
+  const events = audit.filter((e) => e.task === t.task);
+  const gate = events
+    .map((e) => /eval gate:\s*(pass|fail)/i.exec(e.reason)?.[1]?.toUpperCase())
+    .find((g): g is string => Boolean(g));
+  const rollout = ["shadow", "canary", "full"];
+  let reached = rollout.indexOf(t.state); // -1 for off / rolled_back
+  let failedAt = -1;
+  if (t.state === "rolled_back") {
+    const before = events.find((e) => e.state === "canary" || e.state === "full");
+    failedAt = before ? rollout.indexOf(before.state) : 1;
+    reached = failedAt;
+  }
+  const registered = events.find((e) => e.action === "register");
+  return PIPELINE.map((p, i): Step => {
+    if (i < 4) {
+      return { id: p.id, label: p.label, caption: p.id === "train" ? `version ${t.version}` : p.hint, state: "done" };
+    }
+    if (p.id === "eval") {
+      return {
+        id: p.id,
+        label: p.label,
+        caption: gate ? `gate ${gate}${gate === "FAIL" && reached >= 0 ? " · overridden" : ""}` : "passed",
+        state: gate === "FAIL" ? "warn" : t.state === "off" ? "current" : "done",
+        when: registered ? ago(registered.ts) : undefined,
+      };
+    }
+    const r = rollout.indexOf(p.id);
+    const ev = events.find((e) => e.state === p.id);
+    const caption =
+      p.id === "shadow" && t.shadow_n
+        ? `${t.shadow_agree}/${t.shadow_n} agree`
+        : p.id === "canary" && t.state === "canary"
+          ? `${Math.round(t.weight * 100)}% traffic`
+          : p.hint;
+    const state: StepState = r === failedAt ? "failed" : r < reached ? "done" : r === reached ? "current" : "todo";
+    return { id: p.id, label: p.label, caption, state, when: ev ? ago(ev.ts) : undefined };
+  });
+}
+
+function Pipeline({ steps }: { steps: Step[] }) {
   return (
-    <ol className="track" aria-label={`Rollout stage: ${ROLLOUT[state]?.[0] ?? state}`}>
-      {STAGES.map((s, i) => (
-        <li
-          key={s}
-          className={`track__step ${state === "rolled_back" ? "is-failed" : i <= reached ? "is-done" : ""} ${
-            i === reached ? "is-current" : ""
-          }`}
-        >
-          <span className="track__dot" aria-hidden="true" />
-          <span className="track__label">{s}</span>
+    <ol className="pipeline" aria-label="Distillation pipeline">
+      {steps.map((s, i) => (
+        <li key={s.id} className={`pipeline__step is-${s.state}`} style={{ animationDelay: `${i * 60}ms` }}>
+          <span className="pipeline__dot" aria-hidden="true">
+            {s.state === "done" && <IconCheck size={11} />}
+            {s.state === "failed" && <IconX size={11} />}
+            {s.state === "warn" && <IconAlert size={11} />}
+          </span>
+          <span className="pipeline__text">
+            <span className="pipeline__label">{s.label}</span>
+            <span className="pipeline__caption">{s.caption}</span>
+            {s.when && <span className="pipeline__when">{s.when}</span>}
+          </span>
+          <span className="sr-only">
+            {s.state === "current" ? "current stage" : s.state === "todo" ? "not reached" : s.state}
+          </span>
         </li>
       ))}
     </ol>
@@ -579,15 +695,23 @@ function RolloutTrack({ state }: { state: string }) {
 
 function DistillPanel({ tasks, audit }: { tasks: DistillTask[]; audit: DistillAuditEvent[] }) {
   const live = tasks.filter((t) => t.state === "canary" || t.state === "full").length;
+  const shadow = tasks.filter((t) => t.state === "shadow").length;
   return (
     <Card
-      title="Distilled models"
+      title="Distillation pipeline"
       icon={<IconFlask />}
-      description="Repeated tasks served by small fine-tuned models. Shadow compares in the background; canary and full serve real traffic and roll back automatically when the failure rate rises."
+      description="Repeated tasks are captured, distilled into small models, and rolled out shadow → canary → full. Canary and full serve real traffic and roll back automatically when the failure rate rises."
       actions={
-        <Badge tone={live ? "ok" : "neutral"} dot>
-          {live} serving
-        </Badge>
+        <>
+          {shadow > 0 && (
+            <Badge tone="purple" dot>
+              {shadow} in shadow
+            </Badge>
+          )}
+          <Badge tone={live ? "ok" : "neutral"} dot>
+            {live} serving
+          </Badge>
+        </>
       }
     >
       {tasks.length === 0 ? (
@@ -595,10 +719,11 @@ function DistillPanel({ tasks, audit }: { tasks: DistillTask[]; audit: DistillAu
           Build and register a distilled model to start a shadow rollout.
         </EmptyState>
       ) : (
-        <div className="distill-grid">
+        <div className="distill-list">
           {tasks.map((t) => {
             const [label, tone] = ROLLOUT[t.state] ?? [t.state, "neutral" as Tone];
             const agree = t.shadow_n ? t.shadow_agree / t.shadow_n : null;
+            const valid = t.shadow_n ? t.shadow_valid / t.shadow_n : null;
             const fail = t.window_n ? t.window_failures / t.window_n : null;
             return (
               <article key={t.system_fingerprint} className="distill-task">
@@ -607,18 +732,23 @@ function DistillPanel({ tasks, audit }: { tasks: DistillTask[]; audit: DistillAu
                     <h3 className="distill-task__name">{t.task}</h3>
                     <span className="distill-task__alias">
                       <code>{t.distilled_alias}</code>
-                      <span className="muted"> replaces </span>
+                      <span className="muted"> learns from </span>
                       <code>{t.source_alias}</code>
                     </span>
                   </div>
-                  <Badge tone={tone} dot>
-                    {label}
-                  </Badge>
+                  <div className="distill-task__badges">
+                    <code className="code-pill" title="Version · system prompt fingerprint">
+                      {t.version} · {t.system_fingerprint.slice(0, 8)}
+                    </code>
+                    <Badge tone={tone} dot>
+                      {label}
+                    </Badge>
+                  </div>
                 </header>
-                <RolloutTrack state={t.state} />
+                <Pipeline steps={pipelineFor(t, audit)} />
                 <dl className="distill-stats">
                   <div>
-                    <dt>Traffic</dt>
+                    <dt>Traffic served</dt>
                     <dd>
                       <strong>{(t.weight * 100).toFixed(0)}%</strong>
                       <Meter value={t.weight} tone="accent" label="Traffic share" />
@@ -628,8 +758,20 @@ function DistillPanel({ tasks, audit }: { tasks: DistillTask[]; audit: DistillAu
                     <dt>Shadow agreement</dt>
                     <dd>
                       <strong>{agree === null ? "—" : pct(agree)}</strong>
-                      <span className="muted small">of {count(t.shadow_n)}</span>
+                      <span className="muted small">
+                        {t.shadow_agree}/{t.shadow_n}
+                      </span>
                       <Meter value={agree} tone={agree !== null && agree < 0.9 ? "warn" : "ok"} label="Shadow agreement" />
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Valid outputs</dt>
+                    <dd>
+                      <strong>{valid === null ? "—" : pct(valid)}</strong>
+                      <span className="muted small">
+                        {t.shadow_valid}/{t.shadow_n}
+                      </span>
+                      <Meter value={valid} tone="ok" label="Valid output rate" />
                     </dd>
                   </div>
                   <div>
@@ -641,14 +783,6 @@ function DistillPanel({ tasks, audit }: { tasks: DistillTask[]; audit: DistillAu
                     </dd>
                   </div>
                 </dl>
-                <footer className="distill-task__foot">
-                  <span>
-                    version <code>{t.version}</code>
-                  </span>
-                  <span title="System prompt fingerprint">
-                    fp <code>{t.system_fingerprint.slice(0, 10)}</code>
-                  </span>
-                </footer>
               </article>
             );
           })}
@@ -667,7 +801,9 @@ function DistillPanel({ tasks, audit }: { tasks: DistillTask[]; audit: DistillAu
                     <div className="timeline__line">
                       <strong>{e.task}</strong>
                       <span className="muted">{e.action}</span>
-                      <span aria-hidden="true" className="muted">→</span>
+                      <span aria-hidden="true" className="muted">
+                        →
+                      </span>
                       <Badge tone={tone}>{ROLLOUT[e.state]?.[0] ?? e.state}</Badge>
                       {e.weight > 0 && <span className="muted">{(e.weight * 100).toFixed(0)}%</span>}
                     </div>
@@ -692,6 +828,14 @@ function DistillPanel({ tasks, audit }: { tasks: DistillTask[]; audit: DistillAu
 // ---- live requests ------------------------------------------------------------------------
 
 function RecentPanel({ rows }: { rows: RecentRequest[] | null }) {
+  // Rows that arrived since the previous poll get a brief highlight (not on first load).
+  const seen = useRef<Set<string> | null>(null);
+  const fresh = useMemo(() => {
+    if (!rows) return new Set<string>();
+    const prev = seen.current;
+    seen.current = new Set(rows.map((r) => r.id));
+    return prev ? new Set(rows.filter((r) => !prev.has(r.id)).map((r) => r.id)) : new Set<string>();
+  }, [rows]);
   return (
     <Card
       title="Live requests"
@@ -733,7 +877,7 @@ function RecentPanel({ rows }: { rows: RecentRequest[] | null }) {
             </thead>
             <tbody>
               {rows.map((r) => (
-                <tr key={r.id}>
+                <tr key={r.id} className={fresh.has(r.id) ? "is-new" : undefined}>
                   <td title={new Date(r.created_at).toLocaleString()}>
                     <div className="cell-stack">
                       <span className="tabular">{time(r.created_at)}</span>
