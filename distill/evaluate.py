@@ -94,9 +94,18 @@ def main() -> None:
     parser.add_argument("--margin", type=float, default=0.03)
     parser.add_argument("--resamples", type=int, default=10_000)
     parser.add_argument("--seed", type=int, default=7)
+    parser.add_argument(
+        "--with-extra",
+        action="store_true",
+        help="also score test_extra.jsonl (traffic captured after training; see distill/build.py)",
+    )
+    parser.add_argument("--out-suffix", default="", help="e.g. '-extended' for a separate file")
     args = parser.parse_args()
 
     rows, manifest = load_split(args.task, "test")
+    if args.with_extra:
+        extra, _ = load_split(args.task, "test_extra")
+        rows = rows + extra
     model = f"{args.task}-{args.version}"
     answers, latencies = [], []
     for i, row in enumerate(rows, 1):
@@ -111,6 +120,7 @@ def main() -> None:
     record = {
         "task": args.task,
         "version": args.version,
+        "test_sets": ["test", "test_extra"] if args.with_extra else ["test"],
         "dataset_hash": manifest["data_hash"],
         "simulated": manifest["simulated"],
         "metric": "accuracy vs dataset gold label (exact match)",
@@ -135,7 +145,7 @@ def main() -> None:
         ],
     }
     RESULTS.mkdir(parents=True, exist_ok=True)
-    path = RESULTS / f"eval_{args.task}_{args.version}.json"
+    path = RESULTS / f"eval_{args.task}_{args.version}{args.out_suffix}.json"
     path.write_text(json.dumps(record, indent=2), encoding="utf-8")
     summary = {k: v for k, v in record.items() if k != "examples"}
     print(json.dumps(summary, indent=2))

@@ -133,6 +133,27 @@ def write(examples: list[dict[str, Any]], manifest: dict[str, Any]) -> Path:
     return out
 
 
+def extend(task: dict[str, Any], examples: list[dict[str, Any]]) -> Path:
+    """Add every example that isn't in the LATEST build to it as `test_extra.jsonl`: traffic
+    captured after the model was trained, so no model has seen it. The build's train/test files
+    and its data hash are untouched (the trained model stays tied to them)."""
+    name = str(task["task"])
+    build_dir: Path = OUT / name / (OUT / name / "LATEST").read_text(encoding="utf-8").strip()
+    known = {
+        json.loads(line)["example_id"]
+        for split in ("train", "test")
+        for line in (build_dir / f"{split}.jsonl").read_text("utf-8").splitlines()
+    }
+    extra = [{**e, "split": "test_extra"} for e in examples if e["example_id"] not in known]
+    with (build_dir / "test_extra.jsonl").open("w", encoding="utf-8") as f:
+        for e in extra:
+            f.write(json.dumps(e) + "\n")
+    manifest = json.loads((build_dir / "manifest.json").read_text(encoding="utf-8"))
+    manifest["counts"]["test_extra"] = len(extra)
+    (build_dir / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    return build_dir
+
+
 def main() -> None:
     name = sys.argv[1]
     tasks = json.loads((OUT / "tasks.json").read_text(encoding="utf-8"))
@@ -140,6 +161,10 @@ def main() -> None:
     examples, manifest = build(
         task, load_content(), asyncio.run(redactions(Settings())), gold_by_text(name)
     )
+    if "--extend" in sys.argv:
+        out = extend(task, examples)
+        print(f"test_extra: {len(examples) - manifest['counts']['deduplicated']} -> {out}")
+        return
     out = write(examples, manifest)
     print(json.dumps(manifest["counts"]), f"-> {out}")
 
