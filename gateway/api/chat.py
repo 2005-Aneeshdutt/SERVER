@@ -43,6 +43,7 @@ from gateway.core.errors import (
     SpendCapExceeded,
 )
 from gateway.core.schemas import ChatChunk, ChatRequest, ChatResponse, Usage
+from gateway.distill.rollout import Decision
 from gateway.limits.spend import Reservation
 from gateway.observability.metrics import (
     CACHE_LOOKUPS,
@@ -85,6 +86,8 @@ class Guards:
     cache_status: str = "BYPASS"  # HIT | MISS | BYPASS
     rate_headers: dict[str, str] = field(default_factory=dict)
     route: RouteDecision | None = None  # model="auto" only
+    distill: Decision | None = None  # distilled-model rollout (shadow or distilled arm)
+    distill_outcome: str | None = None  # served | fallback (invalid answer re-served) | shadow
     finished: bool = False
 
 
@@ -166,6 +169,8 @@ async def _handle(
         CACHE_LOOKUPS.labels("bypass").inc()
     if call.requested_alias == AUTO:
         await _route(container, body, call)  # after the cache: a hit needs no routing
+    if container.rollout is not None:
+        await _distill(container, body, call)
     await _reserve(container, body, call, prompt_tokens)
     if body.stream:
         return await _stream(container, body, call)
@@ -180,6 +185,41 @@ async def _route(container: Container, body: ChatRequest, call: CallContext) -> 
     decision = await container.router.route(body, call.key, remaining)
     call.trace.spec = decision.spec
     call.guards.route = decision
+
+
+async def _distill(container: Container, body: ChatRequest, call: CallContext) -> None:
+    """Rollout of a distilled model for a recognized task (see gateway/distill/rollout.py)."""
+    assert container.rollout is not None
+    decision = await container.rollout.choose(body, call.trace.spec, call.key)
+    if decision is None:
+        return
+    call.guards.distill = decision
+    if decision.arm == "distilled" and decision.spec is not None:
+        call.trace.spec = decision.spec  # its fallbacks lead back to the strong model
+
+
+async def _check_distilled(
+    container: Container, body: ChatRequest, call: CallContext, response: ChatResponse
+) -> ChatResponse:
+    """Validate a distilled answer; re-serve with the strong model if it fails. Shadow mode
+    compares in the background and always returns the strong answer unchanged."""
+    decision, rollout = call.guards.distill, container.rollout
+    if decision is None or rollout is None:
+        return response
+    text = response.choices[0].message.content if response.choices else None
+    if decision.arm == "shadow":
+        rollout.shadow(decision.task, body, text)
+        call.guards.distill_outcome = "shadow"
+        return response
+    served_distilled = call.trace.spec.alias == decision.task.distilled_alias
+    ok = served_distilled and rollout.validate(decision.task, text)
+    await rollout.record(decision.task, ok)
+    if ok or not served_distilled:  # not served_distilled: a fallback already used the strong model
+        call.guards.distill_outcome = "served" if ok else "fallback"
+        return response
+    call.guards.distill_outcome = "fallback"
+    call.trace.spec = container.registry.get(decision.task.source_alias)
+    return await container.dispatcher.complete(body, call.key, call.trace)
 
 
 # ---- limits --------------------------------------------------------------------------------
@@ -259,6 +299,7 @@ async def _nothing() -> AsyncIterator[ChatChunk]:
 
 async def _complete(container: Container, body: ChatRequest, call: CallContext) -> Response:
     response = await container.dispatcher.complete(body, call.key, call.trace)
+    response = await _check_distilled(container, body, call, response)
     usage, estimated = _usage_or_estimate(response.usage, body, _response_text(response))
     response.usage = usage
     cost = await _finish(container, call, Outcome("ok", usage, estimated, response=response))
@@ -409,6 +450,9 @@ def _headers(call: CallContext, cost: Decimal | None) -> dict[str, str]:
         **call.guards.rate_headers,
         **(call.guards.route.headers() if call.guards.route else {}),
     }
+    if call.guards.distill is not None:
+        outcome = call.guards.distill_outcome or call.guards.distill.arm
+        headers["X-Gateway-Distill"] = f"{call.guards.distill.task.task}; {outcome}"
     if cost is not None:
         headers["X-Gateway-Cost-USD"] = format(cost, ".10f")
     # Standard Server-Timing header: what the gateway added vs. time waiting on the provider
