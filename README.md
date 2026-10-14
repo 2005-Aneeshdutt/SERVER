@@ -190,7 +190,7 @@ uv run python loadtest/run.py   # mock upstream (100 ms) + k6; 1 -> 2 -> 3 repli
 The load-test overlay points the gateway at a local mock LLM and blanks every real provider key,
 so a load test can never reach or bill a real provider. Results: [`loadtest/RESULTS.md`](loadtest/RESULTS.md).
 
-## Distillation (in progress: M5 of M5-M12)
+## Distillation (M5-M10 built; results in progress)
 
 The next stage closes the loop. The gateway mines its own traffic for narrow, repeated tasks sent
 to a strong model, distills each one into a small fine-tuned model, gates it statistically, and
@@ -218,6 +218,38 @@ Privacy and labelling:
 - Getting there took four fixes, one of them a pre-existing gateway bug (a missing `sniffio`
   made httpx retry a failed import on every request). They're written up in
   [ADR 0015](docs/decisions/0015-capture-via-kafka.md).
+
+**M6-M10: from captured traffic to a served small model (built, fast path:
+[ADR 0016](docs/decisions/0016-distillation-fast-path.md)).**
+
+1. Discovery groups traffic by system-prompt fingerprint and finds Banking77 intent
+   classification as the top candidate: 100% sent to the strong model, 99% stable output.
+2. The builder turns the strong model's answers into a filtered, deduplicated train/test set.
+3. Qwen2.5-0.5B gets a LoRA fine-tune **on this laptop's CPU** (42-64 min), then is
+   converted to GGUF and served by llama.cpp with grammar-constrained decoding.
+4. A gate scores it against ground truth with a paired bootstrap. The gateway then routes the
+   task through shadow, canary and full, with atomic auto-rollback, and the dashboard shows
+   the pipeline.
+
+**Results so far, all simulated** ([`distill/RESULTS.md`](distill/RESULTS.md)):
+
+| Model | Accuracy | Gate |
+|---|---|---|
+| v1 | 89.2% (vs 92.4%) | FAIL |
+| v2 | 89.7% | FAIL |
+| v3 | **92.4%, an exact tie with the strong model** | FAIL |
+
+v3 fails only because the gate is underpowered: with 185 test examples the CI is ±3.8 points,
+wider than the 3-point margin. The margin isn't being loosened. Instead, every remaining unseen
+example is being replayed (Groq's free quota allows ~1,000 requests/day) for one pre-committed
+re-run of the gate.
+
+Until a model passes, the gateway only runs it in **shadow**. It has never served a real
+answer.
+
+Two problems turned up along the way and are written up in the results:
+- **A sampling bug:** the traffic covered only 23 of Banking77's 77 intents. It's fixed.
+- **Groq's daily quota** limits how much teacher data can be collected.
 
 **Simulated traffic** drives it, from three public, checkable tasks: Banking77 intent
 classification, WikiSQL text-to-SQL scored by execution, and Few-NERD entity extraction to JSON.
@@ -253,6 +285,7 @@ Tests mock all provider HTTP with `respx`. No real API calls happen in tests or 
 | **M3:** `model: "auto"` routing: rules, classifier, per-key quality, reproducible eval (RouteLLM metrics) | done; classifier ≈ heuristic for this model pair (see above) |
 | **M4:** playground, dashboard, kill switch, demo keys | done; see screenshots above |
 | **M5:** traffic capture (Kafka, Postgres + Parquet), PII scrubbing, opt-in, simulated-traffic replayer | done; see "Distillation" above |
+| **M6-M10:** discovery, dataset, CPU LoRA training, llama.cpp serving, eval gate, shadow/canary/full rollout with auto-rollback | built and running; no model has passed the gate yet (see above) |
 
 ### M1 verification
 - The official OpenAI SDK runs against the gateway (streaming and non-streaming) in tests with
