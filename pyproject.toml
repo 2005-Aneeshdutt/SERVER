@@ -46,6 +46,10 @@ dev = [
 # Offline distillation pipeline: capture consumer (Kafka -> Postgres + Parquet), replayer,
 # discovery, dataset builder, eval. Never imported by the gateway itself.
 distill = ["aiokafka>=0.11", "pyarrow>=17"]
+train = [
+    "peft>=0.12",
+    "transformers>=4.44",
+]
 
 [tool.uv]
 default-groups = ["dev"]
