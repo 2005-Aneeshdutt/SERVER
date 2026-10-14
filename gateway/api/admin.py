@@ -45,6 +45,7 @@ class KeyCreate(BaseModel):
     routing_quality: RoutingQuality = "balanced"
     distill_opt_in: bool = False  # capture PII-scrubbed prompts/responses for distillation
     simulated: bool = False  # traffic from this key is labelled simulated everywhere
+    distill_serving: bool = False  # may be served by a distilled model during a rollout
 
 
 class KeyUpdate(BaseModel):
@@ -59,6 +60,7 @@ class KeyUpdate(BaseModel):
     routing_quality: RoutingQuality | None = None
     distill_opt_in: bool | None = None
     simulated: bool | None = None
+    distill_serving: bool | None = None
 
 
 class KeyOut(BaseModel):
@@ -73,6 +75,7 @@ class KeyOut(BaseModel):
     routing_quality: str
     distill_opt_in: bool
     simulated: bool
+    distill_serving: bool
     created_at: datetime | None
 
     @classmethod
@@ -89,6 +92,7 @@ class KeyOut(BaseModel):
             routing_quality=row.routing_quality,
             distill_opt_in=row.distill_opt_in,
             simulated=row.simulated,
+            distill_serving=row.distill_serving,
             created_at=row.created_at,
         )
 
@@ -131,6 +135,7 @@ async def create_key(body: KeyCreate, container: ContainerDep, store: StoreDep) 
         routing_quality=body.routing_quality,
         distill_opt_in=body.distill_opt_in,
         simulated=body.simulated,
+        distill_serving=body.distill_serving,
     )
     row = await store.get_row(record.id)
     assert row is not None
@@ -149,7 +154,8 @@ async def update_key(
     changes = body.model_dump(include=body.model_fields_set)
     if changes.get("name") is None:
         changes.pop("name", None)
-    for non_nullable in ("active", "routing_quality", "distill_opt_in", "simulated"):
+    non_nullable_fields = ("active", "routing_quality", "distill_opt_in", "simulated")
+    for non_nullable in (*non_nullable_fields, "distill_serving"):
         if changes.get(non_nullable) is None:
             changes.pop(non_nullable, None)
     _check_aliases(container, changes.get("allowed_models"))
@@ -267,3 +273,79 @@ async def recent_requests(
 ) -> dict[str, Any]:
     rows, source, lag_s = await _usage_reader(container).recent(limit)
     return {"source": source, "replica_lag_s": lag_s, "rows": [_format_row(r) for r in rows]}
+
+
+# ---- distilled-model rollout (M10) -----------------------------------------------------------
+
+RolloutState = Literal["off", "shadow", "canary", "full", "rolled_back"]
+
+
+class DistillTaskCreate(BaseModel):
+    task: str = Field(min_length=1, max_length=100)
+    system_fingerprint: str = Field(min_length=8, max_length=32)
+    source_alias: str
+    distilled_alias: str
+    validator: dict[str, Any]
+    version: str = "v1"
+
+
+class DistillStateChange(BaseModel):
+    state: RolloutState
+    weight: float = Field(default=0.0, ge=0, le=1)
+    reason: str = Field(default="manual", max_length=400)
+
+
+def _rollout(container: ContainerDep) -> Any:
+    if container.rollout is None:
+        raise AdminDisabled("Distilled-model rollout is not enabled (DISTILL_ROLLOUT_ENABLED).")
+    return container.rollout
+
+
+@router.get("/distill/tasks")
+async def distill_tasks(container: ContainerDep) -> list[dict[str, Any]]:
+    rollout = _rollout(container)
+    out = []
+    for fp, t in (await rollout.tasks(force=True)).items():
+        stats = await rollout.stats(fp)
+        out.append(
+            {
+                "task": t.task,
+                "system_fingerprint": fp,
+                "source_alias": t.source_alias,
+                "distilled_alias": t.distilled_alias,
+                "version": t.version,
+                "state": t.state,
+                "weight": t.weight,
+                **stats,
+            }
+        )
+    return out
+
+
+@router.post("/distill/tasks", status_code=201)
+async def register_distill_task(body: DistillTaskCreate, container: ContainerDep) -> dict[str, str]:
+    for alias in (body.source_alias, body.distilled_alias):
+        container.registry.get(alias)  # 404 if unknown
+    await _rollout(container).register(body.model_dump(), actor="admin")
+    return {"system_fingerprint": body.system_fingerprint, "state": "off"}
+
+
+@router.post("/distill/tasks/{fingerprint}/state")
+async def set_distill_state(
+    fingerprint: str, body: DistillStateChange, container: ContainerDep
+) -> dict[str, Any]:
+    rollout = _rollout(container)
+    if fingerprint not in await rollout.tasks(force=True):
+        raise NotFound(f"No distilled task with fingerprint {fingerprint}")
+    await rollout.set_state(fingerprint, body.state, body.weight, actor="admin", reason=body.reason)
+    t = (await rollout.tasks())[fingerprint]
+    return {"task": t.task, "state": t.state, "weight": t.weight}
+
+
+@router.get("/distill/audit")
+async def distill_audit(
+    container: ContainerDep, limit: Annotated[int, Query(ge=1, le=500)] = 50
+) -> list[dict[str, Any]]:
+    if container.distill_audit is None:
+        raise AdminDisabled("Admin API needs a database.")
+    return await container.distill_audit.recent(limit)
