@@ -1,0 +1,130 @@
+{
+  "task": "banking77-intent",
+  "dataset_hash": "e28080ae8390253f0ccd6d6550ca1407c186a49ce526c485ab2191ed275bc820",
+  "dataset_counts": {
+    "captured": 804,
+    "served_by_source": 800,
+    "not_scrubbed": 800,
+    "validator_passed": 792,
+    "deduplicated": 792,
+    "train": 607,
+    "test": 185
+  },
+  "simulated": true,
+  "base_model": "Qwen/Qwen2.5-0.5B-Instruct",
+  "method": "LoRA, merged",
+  "lora": {
+    "r": 16,
+    "alpha": 32,
+    "dropout": 0.05,
+    "targets": [
+      "q_proj",
+      "k_proj",
+      "v_proj",
+      "o_proj",
+      "gate_proj",
+      "up_proj",
+      "down_proj"
+    ],
+    "layers": [
+      0,
+      23
+    ]
+  },
+  "epochs": 4,
+  "batch_size": 16,
+  "learning_rate": 0.0002,
+  "max_len": 128,
+  "seed": 7,
+  "device": "cpu",
+  "train_rows": 607,
+  "steps": 152,
+  "wall_seconds": 3823.5,
+  "loss_curve": [
+    {
+      "step": 10,
+      "epoch": 0,
+      "loss": 0.9033
+    },
+    {
+      "step": 20,
+      "epoch": 0,
+      "loss": 0.7947
+    },
+    {
+      "step": 30,
+      "epoch": 0,
+      "loss": 0.0195
+    },
+    {
+      "step": 40,
+      "epoch": 1,
+      "loss": 0.1107
+    },
+    {
+      "step": 50,
+      "epoch": 1,
+      "loss": 0.0838
+    },
+    {
+      "step": 60,
+      "epoch": 1,
+      "loss": 0.0777
+    },
+    {
+      "step": 70,
+      "epoch": 1,
+      "loss": 0.0916
+    },
+    {
+      "step": 80,
+      "epoch": 2,
+      "loss": 0.0383
+    },
+    {
+      "step": 90,
+      "epoch": 2,
+      "loss": 0.0864
+    },
+    {
+      "step": 100,
+      "epoch": 2,
+      "loss": 0.0042
+    },
+    {
+      "step": 110,
+      "epoch": 2,
+      "loss": 0.0149
+    },
+    {
+      "step": 120,
+      "epoch": 3,
+      "loss": 0.012
+    },
+    {
+      "step": 130,
+      "epoch": 3,
+      "loss": 0.0087
+    },
+    {
+      "step": 140,
+      "epoch": 3,
+      "loss": 0.0326
+    },
+    {
+      "step": 150,
+      "epoch": 3,
+      "loss": 0.0019
+    },
+    {
+      "step": 152,
+      "epoch": 3,
+      "loss": 0.0036
+    }
+  ],
+  "versions": {
+    "torch": "2.14.1+cpu",
+    "transformers": "5.19.0",
+    "peft": "0.21.2"
+  }
+}

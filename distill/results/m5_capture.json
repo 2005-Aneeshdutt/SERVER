@@ -1,16 +1,16 @@
 {
   "by_task": {
     "banking77-intent": {
-      "events": 100,
-      "simulated": 100,
-      "content_captured": 100,
-      "ok": 100,
-      "prompt_tokens": 52911,
-      "completion_tokens": 3876,
-      "list_price_cost_usd": "0.0101619000",
+      "events": 900,
+      "simulated": 900,
+      "content_captured": 900,
+      "ok": 882,
+      "prompt_tokens": 474508,
+      "completion_tokens": 29841,
+      "list_price_cost_usd": "0.0889804500",
       "pii_redactions": 0,
       "served_alias": {
-        "groq-gpt-oss-120b": 100
+        "groq-gpt-oss-120b": 900
       }
     },
     "wikisql-sql": {
@@ -54,13 +54,13 @@
     }
   },
   "parquet": {
-    "files": 28,
-    "rows": 400,
-    "distinct_events": 400
+    "files": 100,
+    "rows": 1200,
+    "distinct_events": 1200
   },
   "sent": {
     "banking77-intent": {
-      "200": 100
+      "200": 884
     },
     "wikisql-sql": {
       "200": 100
@@ -74,7 +74,7 @@
   },
   "scrubber_false_positives": {
     "banking77-intent": {
-      "prompts": 400,
+      "prompts": 1200,
       "changed": 0
     },
     "wikisql-sql": {

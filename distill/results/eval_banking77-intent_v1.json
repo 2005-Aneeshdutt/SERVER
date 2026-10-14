@@ -1,0 +1,1140 @@
+{
+  "task": "banking77-intent",
+  "version": "v1",
+  "dataset_hash": "e28080ae8390253f0ccd6d6550ca1407c186a49ce526c485ab2191ed275bc820",
+  "simulated": true,
+  "metric": "accuracy vs dataset gold label (exact match)",
+  "n": 185,
+  "distilled_accuracy": 0.8919,
+  "strong_accuracy": 0.9243,
+  "distilled_valid": 0.9784,
+  "agreement_with_strong": 0.9081,
+  "diff": -0.0324,
+  "ci95": [
+    -0.0703,
+    0.0
+  ],
+  "bootstrap": {
+    "resamples": 10000,
+    "seed": 7,
+    "paired": true
+  },
+  "margin": 0.03,
+  "passed": false,
+  "distilled_latency_ms": {
+    "p50": 429.4,
+    "p95": 740.9
+  },
+  "examples": [
+    {
+      "example_id": "284c7f0fe69b01cc",
+      "gold": "balance_not_updated_after_cheque_or_cash_deposit",
+      "strong": "balance_not_updated_after_cheque_or_cash_deposit",
+      "distilled": "balance_not_updated_after_cheque_or_cash_deposit"
+    },
+    {
+      "example_id": "1ddc757b04e31cee",
+      "gold": "balance_not_updated_after_cheque_or_cash_deposit",
+      "strong": "balance_not_updated_after_cheque_or_cash_deposit",
+      "distilled": "balance_not_updated_after_cheque_or_cash_deposit"
+    },
+    {
+      "example_id": "85d9c48993a57b33",
+      "gold": "balance_not_updated_after_cheque_or_cash_deposit",
+      "strong": "balance_not_updated_after_cheque_or_cash_deposit",
+      "distilled": "balance_not_updated_after_cheque_or_cash_deposit"
+    },
+    {
+      "example_id": "1399593d984f381f",
+      "gold": "balance_not_updated_after_cheque_or_cash_deposit",
+      "strong": "balance_not_updated_after_cheque_or_cash_deposit",
+      "distilled": "balance_not_updated_after_cheque_or_cash_deposit"
+    },
+    {
+      "example_id": "1428f18091eb0c5d",
+      "gold": "balance_not_updated_after_cheque_or_cash_deposit",
+      "strong": "balance_not_updated_after_cheque_or_cash_deposit",
+      "distilled": "balance_not_updated_after_cheque_or_cash_deposit"
+    },
+    {
+      "example_id": "6349182b151a0862",
+      "gold": "balance_not_updated_after_cheque_or_cash_deposit",
+      "strong": "balance_not_updated_after_cheque_or_cash_deposit",
+      "distilled": "balance_not_updated_after_cheque_or_cash_deposit"
+    },
+    {
+      "example_id": "e826afe95fc6a415",
+      "gold": "balance_not_updated_after_cheque_or_cash_deposit",
+      "strong": "balance_not_updated_after_cheque_or_cash_deposit",
+      "distilled": "balance_not_updated_after_cheque_or_cash_deposit"
+    },
+    {
+      "example_id": "49a26cb60341edb3",
+      "gold": "balance_not_updated_after_cheque_or_cash_deposit",
+      "strong": "balance_not_updated_after_cheque_or_cash_deposit",
+      "distilled": "balance_not_updated_after_cheque_or_cash_deposit"
+    },
+    {
+      "example_id": "b1264ebcf9f7daf1",
+      "gold": "balance_not_updated_after_cheque_or_cash_deposit",
+      "strong": "balance_not_updated_after_cheque_or_cash_deposit",
+      "distilled": "top_up_by_cash_or_cheque"
+    },
+    {
+      "example_id": "20f5c8eae0d7f5e2",
+      "gold": "balance_not_updated_after_cheque_or_cash_deposit",
+      "strong": "balance_not_updated_after_cheque_or_cash_deposit",
+      "distilled": "balance_not_updated_after_cheque_or_cash_deposit"
+    },
+    {
+      "example_id": "4c8ee009f2e8b800",
+      "gold": "balance_not_updated_after_cheque_or_cash_deposit",
+      "strong": "balance_not_updated_after_cheque_or_cash_deposit",
+      "distilled": "balance_not_updated_after_cheque_or_cash_deposit"
+    },
+    {
+      "example_id": "78c07f51b47b6c40",
+      "gold": "balance_not_updated_after_cheque_or_cash_deposit",
+      "strong": "balance_not_updated_after_cheque_or_cash_deposit",
+      "distilled": "balance_not_updated_after_cheque_or_cash_deposit"
+    },
+    {
+      "example_id": "6f6b56a97e2b05df",
+      "gold": "balance_not_updated_after_cheque_or_cash_deposit",
+      "strong": "balance_not_updated_after_cheque_or_cash_deposit",
+      "distilled": "balance_not_updated_after_cheque_or_cash_deposit"
+    },
+    {
+      "example_id": "d3145f18994d9aec",
+      "gold": "balance_not_updated_after_cheque_or_cash_deposit",
+      "strong": "balance_not_updated_after_cheque_or_cash_deposit",
+      "distilled": "balance_not_updated_after_cheque_or_cash_deposit"
+    },
+    {
+      "example_id": "3bff645ab6fbbe48",
+      "gold": "balance_not_updated_after_cheque_or_cash_deposit",
+      "strong": "balance_not_updated_after_cheque_or_cash_deposit",
+      "distilled": "balance_not_updated_after_cheque_or_cash_deposit"
+    },
+    {
+      "example_id": "94bb72bfc8689fa7",
+      "gold": "balance_not_updated_after_cheque_or_cash_deposit",
+      "strong": "balance_not_updated_after_cheque_or_cash_deposit",
+      "distilled": "balance_not_updated_after_cheque_or_cash_deposit"
+    },
+    {
+      "example_id": "63819662b834ba4c",
+      "gold": "balance_not_updated_after_cheque_or_cash_deposit",
+      "strong": "balance_not_updated_after_cheque_or_cash_deposit",
+      "distilled": "balance_not_updated_after_cheque_or_cash_deposit"
+    },
+    {
+      "example_id": "111914190b27b351",
+      "gold": "balance_not_updated_after_cheque_or_cash_deposit",
+      "strong": "balance_not_updated_after_cheque_or_cash_deposit",
+      "distilled": "balance_not_updated_after_cheque_or_cash_deposit"
+    },
+    {
+      "example_id": "758fed2cb224ba6a",
+      "gold": "balance_not_updated_after_cheque_or_cash_deposit",
+      "strong": "balance_not_updated_after_cheque_or_cash_deposit",
+      "distilled": "balance_not_updated_after_cheque_or_cash_deposit"
+    },
+    {
+      "example_id": "b2ca6bf1f996d57c",
+      "gold": "balance_not_updated_after_cheque_or_cash_deposit",
+      "strong": "balance_not_updated_after_cheque_or_cash_deposit",
+      "distilled": "balance_not_updated_after_cheque_or_cash_deposit"
+    },
+    {
+      "example_id": "d8e08066247b62b5",
+      "gold": "balance_not_updated_after_cheque_or_cash_deposit",
+      "strong": "balance_not_updated_after_cheque_or_cash_deposit",
+      "distilled": "balance_not_updated_after_cheque_or_cash_deposit"
+    },
+    {
+      "example_id": "3773ba2a15ce8e0d",
+      "gold": "balance_not_updated_after_cheque_or_cash_deposit",
+      "strong": "balance_not_updated_after_cheque_or_cash_deposit",
+      "distilled": "balance_not_updated_after_cheque_or_cash_deposit"
+    },
+    {
+      "example_id": "e06f13903b3a153a",
+      "gold": "balance_not_updated_after_cheque_or_cash_deposit",
+      "strong": "balance_not_updated_after_cheque_or_cash_deposit",
+      "distilled": "balance_not_updated_after_cheque_or_cash_deposit"
+    },
+    {
+      "example_id": "eeffea54661a7d35",
+      "gold": "balance_not_updated_after_cheque_or_cash_deposit",
+      "strong": "balance_not_updated_after_cheque_or_cash_deposit",
+      "distilled": "balance_not_updated_after_cheque_or_cash_deposit"
+    },
+    {
+      "example_id": "51beda7f4c4006f7",
+      "gold": "balance_not_updated_after_cheque_or_cash_deposit",
+      "strong": "balance_not_updated_after_cheque_or_cash_deposit",
+      "distilled": "balance_not_updated_after_cheque_or_cash_deposit"
+    },
+    {
+      "example_id": "1caef5cf026be27d",
+      "gold": "balance_not_updated_after_cheque_or_cash_deposit",
+      "strong": "balance_not_updated_after_cheque_or_cash_deposit",
+      "distilled": "balance_not_updated_after_cheque_or_cash_deposit"
+    },
+    {
+      "example_id": "57d57fcd365a4a48",
+      "gold": "balance_not_updated_after_cheque_or_cash_deposit",
+      "strong": "balance_not_updated_after_cheque_or_cash_deposit",
+      "distilled": "balance_not_updated_after_cheque_or_cash_deposit"
+    },
+    {
+      "example_id": "f3294bd6d4de1020",
+      "gold": "balance_not_updated_after_cheque_or_cash_deposit",
+      "strong": "balance_not_updated_after_cheque_or_cash_deposit",
+      "distilled": "balance_not_updated_after_cheque_or_cash_deposit"
+    },
+    {
+      "example_id": "4f7a2a2c7b5dfe49",
+      "gold": "balance_not_updated_after_cheque_or_cash_deposit",
+      "strong": "balance_not_updated_after_cheque_or_cash_deposit",
+      "distilled": "balance_not_updated_after_cheque_or_cash_deposit"
+    },
+    {
+      "example_id": "94a2ff0e44c31ba0",
+      "gold": "balance_not_updated_after_cheque_or_cash_deposit",
+      "strong": "balance_not_updated_after_cheque_or_cash_deposit",
+      "distilled": "balance_not_updated_after_cheque_or_cash_deposit"
+    },
+    {
+      "example_id": "6d446eb298819766",
+      "gold": "balance_not_updated_after_cheque_or_cash_deposit",
+      "strong": "balance_not_updated_after_cheque_or_cash_deposit",
+      "distilled": "balance_not_updated_after_cheque_or_cash_deposit"
+    },
+    {
+      "example_id": "f23a84b79dd4facb",
+      "gold": "balance_not_updated_after_cheque_or_cash_deposit",
+      "strong": "balance_not_updated_after_cheque_or_cash_deposit",
+      "distilled": "balance_not_updated_after_cheque_or_cash_deposit"
+    },
+    {
+      "example_id": "b46d889139df7f71",
+      "gold": "balance_not_updated_after_cheque_or_cash_deposit",
+      "strong": "balance_not_updated_after_cheque_or_cash_deposit",
+      "distilled": "balance_not_updated_after_cheque_or_cash_deposit"
+    },
+    {
+      "example_id": "9133e7261ba582bb",
+      "gold": "wrong_amount_of_cash_received",
+      "strong": "cash_withdrawal_not_recognised",
+      "distilled": "cash_withdrawal_not_updated"
+    },
+    {
+      "example_id": "5f76f26357f37d34",
+      "gold": "card_payment_fee_charged",
+      "strong": "card_payment_fee_charged",
+      "distilled": "card_payment_fee_charged"
+    },
+    {
+      "example_id": "12876ff46bececd5",
+      "gold": "card_payment_fee_charged",
+      "strong": "extra_charge_on_statement",
+      "distilled": "card_payment_fee_charged"
+    },
+    {
+      "example_id": "3c475ae9de1dca9f",
+      "gold": "card_payment_fee_charged",
+      "strong": "card_payment_fee_charged",
+      "distilled": "card_payment_fee_charged"
+    },
+    {
+      "example_id": "c9a501013f4bc7d1",
+      "gold": "card_payment_fee_charged",
+      "strong": "card_payment_fee_charged",
+      "distilled": "extra_charge_on_statement"
+    },
+    {
+      "example_id": "edb4c3162646a50b",
+      "gold": "wrong_amount_of_cash_received",
+      "strong": "wrong_amount_of_cash_received",
+      "distilled": "wrong_amount_of_cash_received"
+    },
+    {
+      "example_id": "1ee71d61e098a675",
+      "gold": "card_payment_fee_charged",
+      "strong": "card_payment_fee_charged",
+      "distilled": "card_payment_fee_charged"
+    },
+    {
+      "example_id": "9df35f006b01a844",
+      "gold": "card_payment_fee_charged",
+      "strong": "card_payment_fee_charged",
+      "distilled": "card_payment_fee_charged"
+    },
+    {
+      "example_id": "e2a8faffbd557147",
+      "gold": "card_payment_fee_charged",
+      "strong": "extra_charge_on_statement",
+      "distilled": "card_payment_fee_charged"
+    },
+    {
+      "example_id": "c867a885c4da6472",
+      "gold": "card_payment_fee_charged",
+      "strong": "extra_charge_on_statement",
+      "distilled": "extra_charge_on_statement"
+    },
+    {
+      "example_id": "4f9029c6bb3d7e23",
+      "gold": "card_payment_fee_charged",
+      "strong": "extra_charge_on_statement",
+      "distilled": "extra_charge_on_statement"
+    },
+    {
+      "example_id": "c7322c058c106d66",
+      "gold": "card_payment_fee_charged",
+      "strong": "card_payment_fee_charged",
+      "distilled": "extra_charge_on_statement"
+    },
+    {
+      "example_id": "39b1e7db78691555",
+      "gold": "card_payment_fee_charged",
+      "strong": "extra_charge_on_statement",
+      "distilled": "card_payment_fee_charged"
+    },
+    {
+      "example_id": "8bfdb6dee956c846",
+      "gold": "card_payment_fee_charged",
+      "strong": "card_payment_fee_charged",
+      "distilled": "card_payment_fee_charged"
+    },
+    {
+      "example_id": "c8900b9fbce78fe3",
+      "gold": "card_payment_fee_charged",
+      "strong": "card_payment_fee_charged",
+      "distilled": "card_payment_fee_charged"
+    },
+    {
+      "example_id": "7a05c53163ad4628",
+      "gold": "card_payment_fee_charged",
+      "strong": "card_payment_fee_charged",
+      "distilled": "card_payment_fee_charged"
+    },
+    {
+      "example_id": "9b69967279927607",
+      "gold": "card_payment_fee_charged",
+      "strong": "card_payment_fee_charged",
+      "distilled": "card_payment_fee_charged"
+    },
+    {
+      "example_id": "06f07fb78be5c6b5",
+      "gold": "card_payment_fee_charged",
+      "strong": "card_payment_fee_charged",
+      "distilled": "card_payment_fee_charged"
+    },
+    {
+      "example_id": "358f637d3c3ee7f5",
+      "gold": "card_payment_fee_charged",
+      "strong": "card_payment_fee_charged",
+      "distilled": "card_payment_fee_charged"
+    },
+    {
+      "example_id": "87def2b241542d3c",
+      "gold": "card_payment_fee_charged",
+      "strong": "card_payment_fee_charged",
+      "distilled": "card_payment_fee_charged"
+    },
+    {
+      "example_id": "23b40b5d43a36632",
+      "gold": "card_payment_fee_charged",
+      "strong": "card_payment_fee_charged",
+      "distilled": "card_payment_fee_charged"
+    },
+    {
+      "example_id": "3a418c168914b10d",
+      "gold": "country_support",
+      "strong": "country_support",
+      "distilled": "getting_spare_card"
+    },
+    {
+      "example_id": "5c092d4cf6680a83",
+      "gold": "top_up_failed",
+      "strong": "top_up_failed",
+      "distilled": "top_up_failed"
+    },
+    {
+      "example_id": "67a435c4fb103c7b",
+      "gold": "top_up_failed",
+      "strong": "top_up_failed",
+      "distilled": "top_up_failed"
+    },
+    {
+      "example_id": "9db5179c962f48b7",
+      "gold": "top_up_failed",
+      "strong": "top_up_failed",
+      "distilled": "top_up_failed"
+    },
+    {
+      "example_id": "a581a18c5bc32768",
+      "gold": "top_up_failed",
+      "strong": "top_up_failed",
+      "distilled": "top_up_failed"
+    },
+    {
+      "example_id": "eb34ea5a09881c72",
+      "gold": "top_up_failed",
+      "strong": "top_up_failed",
+      "distilled": "top_up_failed"
+    },
+    {
+      "example_id": "f641d2d0925998ef",
+      "gold": "top_up_failed",
+      "strong": "top_up_failed",
+      "distilled": "top_up_failed"
+    },
+    {
+      "example_id": "461860d562f646a9",
+      "gold": "top_up_failed",
+      "strong": "top_up_failed",
+      "distilled": "top_up_failed"
+    },
+    {
+      "example_id": "6e52c6795937012c",
+      "gold": "top_up_failed",
+      "strong": "top_up_failed",
+      "distilled": "top_up_failed"
+    },
+    {
+      "example_id": "dca3f4bcac3e7015",
+      "gold": "top_up_failed",
+      "strong": "top_up_failed",
+      "distilled": "top_up_failed"
+    },
+    {
+      "example_id": "24d5cdfa2261931d",
+      "gold": "top_up_failed",
+      "strong": "top_up_failed",
+      "distilled": "top_up_failed"
+    },
+    {
+      "example_id": "7a0727e4655c96f7",
+      "gold": "top_up_failed",
+      "strong": "top_up_failed",
+      "distilled": "top_up_failed"
+    },
+    {
+      "example_id": "88e006692569c0cc",
+      "gold": "top_up_failed",
+      "strong": "top_up_failed",
+      "distilled": "top_up_failed"
+    },
+    {
+      "example_id": "7454fcbe1fd82812",
+      "gold": "top_up_failed",
+      "strong": "failed_transfer",
+      "distilled": "pending_top_up"
+    },
+    {
+      "example_id": "725cf4131be3790f",
+      "gold": "top_up_failed",
+      "strong": "top_up_failed",
+      "distilled": "top_up_failed"
+    },
+    {
+      "example_id": "50b655d4aa0600c0",
+      "gold": "top_up_failed",
+      "strong": "top_up_failed",
+      "distilled": "top_up_failed"
+    },
+    {
+      "example_id": "a88c265e49654778",
+      "gold": "top_up_failed",
+      "strong": "top_up_failed",
+      "distilled": "top_up_failed"
+    },
+    {
+      "example_id": "4e197b6b0ac1d844",
+      "gold": "top_up_failed",
+      "strong": "top_up_failed",
+      "distilled": "top_up_failed"
+    },
+    {
+      "example_id": "be395fe8b093c089",
+      "gold": "top_up_failed",
+      "strong": "top_up_failed",
+      "distilled": "top_up_failed"
+    },
+    {
+      "example_id": "91bd47d09e9fe421",
+      "gold": "top_up_failed",
+      "strong": "top_up_failed",
+      "distilled": "top_up_failed"
+    },
+    {
+      "example_id": "a9d9a25ed0f696fd",
+      "gold": "top_up_failed",
+      "strong": "top_up_failed",
+      "distilled": "top_up_failed"
+    },
+    {
+      "example_id": "7a2fb28c10bb1dcc",
+      "gold": "top_up_failed",
+      "strong": "top_up_failed",
+      "distilled": "top_up_failed"
+    },
+    {
+      "example_id": "74c69430f044196c",
+      "gold": "top_up_failed",
+      "strong": "top_up_failed",
+      "distilled": "top_up_failed"
+    },
+    {
+      "example_id": "d3f4442c9986dcb0",
+      "gold": "top_up_failed",
+      "strong": "top_up_failed",
+      "distilled": "top_up_failed"
+    },
+    {
+      "example_id": "ae03380c49944aed",
+      "gold": "top_up_failed",
+      "strong": "top_up_failed",
+      "distilled": "top_up_failed"
+    },
+    {
+      "example_id": "06a0eb87af78fcc2",
+      "gold": "getting_spare_card",
+      "strong": "getting_spare_card",
+      "distilled": "getting_spare_card"
+    },
+    {
+      "example_id": "8e20710c68d6d292",
+      "gold": "top_up_by_cash_or_cheque",
+      "strong": "top_up_by_cash_or_cheque",
+      "distilled": "top_up_by_cash_or_cheque"
+    },
+    {
+      "example_id": "251723d285a95a78",
+      "gold": "top_up_by_cash_or_cheque",
+      "strong": "top_up_by_cash_or_cheque",
+      "distilled": "top_up_by_cash_or_cheque"
+    },
+    {
+      "example_id": "a006c21f295ea7c4",
+      "gold": "top_up_by_cash_or_cheque",
+      "strong": "top_up_by_cash_or_cheque",
+      "distilled": "top_up_by_cash_or_cheque"
+    },
+    {
+      "example_id": "548dce382cfd9d38",
+      "gold": "top_up_by_cash_or_cheque",
+      "strong": "top_up_by_cash_or_cheque",
+      "distilled": "top_up_by_cash_or_cheque"
+    },
+    {
+      "example_id": "e720933287c68493",
+      "gold": "top_up_by_cash_or_cheque",
+      "strong": "top_up_by_cash_or_cheque",
+      "distilled": "top_up_by_cash_or_cheque"
+    },
+    {
+      "example_id": "297d1226de126f6c",
+      "gold": "getting_spare_card",
+      "strong": "getting_spare_card",
+      "distilled": "getting_spare_card"
+    },
+    {
+      "example_id": "a361b45a8b474206",
+      "gold": "getting_spare_card",
+      "strong": "getting_spare_card",
+      "distilled": "getting_spare_card"
+    },
+    {
+      "example_id": "5a2b849b24e4eaa4",
+      "gold": "getting_spare_card",
+      "strong": "getting_spare_card",
+      "distilled": "getting_spare_card"
+    },
+    {
+      "example_id": "7cc764168df606f6",
+      "gold": "top_up_by_cash_or_cheque",
+      "strong": "top_up_by_cash_or_cheque",
+      "distilled": "top_up_by_cash_or_cheque"
+    },
+    {
+      "example_id": "222a326cc06dc976",
+      "gold": "top_up_by_cash_or_cheque",
+      "strong": "top_up_by_cash_or_cheque",
+      "distilled": "top_up_by_cash_or_cheque"
+    },
+    {
+      "example_id": "92c979a98e5b4f01",
+      "gold": "top_up_by_cash_or_cheque",
+      "strong": "top_up_by_cash_or_cheque",
+      "distilled": "top_up_by_cash_or_cheque"
+    },
+    {
+      "example_id": "06483d833714a3da",
+      "gold": "getting_spare_card",
+      "strong": "getting_spare_card",
+      "distilled": "getting_spare_card"
+    },
+    {
+      "example_id": "f1224e1d58fc774b",
+      "gold": "top_up_by_cash_or_cheque",
+      "strong": "top_up_by_cash_or_cheque",
+      "distilled": "top_up_by_cash_or_cheque"
+    },
+    {
+      "example_id": "17af4277a1eb15e6",
+      "gold": "top_up_by_cash_or_cheque",
+      "strong": "top_up_by_cash_or_cheque",
+      "distilled": "top_up_by_cash_or_cheque"
+    },
+    {
+      "example_id": "ca6fcbfde0929b00",
+      "gold": "top_up_by_cash_or_cheque",
+      "strong": "top_up_by_cash_or_cheque",
+      "distilled": "top_up_by_cash_or_cheque"
+    },
+    {
+      "example_id": "86b28e3460deca5a",
+      "gold": "top_up_by_cash_or_cheque",
+      "strong": "top_up_by_cash_or_cheque",
+      "distilled": "top_up_by_cash_or_cheque"
+    },
+    {
+      "example_id": "404e458feb81c849",
+      "gold": "top_up_by_cash_or_cheque",
+      "strong": "topping_up_by_card",
+      "distilled": "apple_pay_or_google_pay"
+    },
+    {
+      "example_id": "289a1d8ccb96d905",
+      "gold": "wrong_exchange_rate_for_cash_withdrawal",
+      "strong": "cash_withdrawal_charge",
+      "distilled": "cash_withdrawal_charge"
+    },
+    {
+      "example_id": "8edbaeb14c867aef",
+      "gold": "wrong_exchange_rate_for_cash_withdrawal",
+      "strong": "wrong_exchange_rate_for_cash_withdrawal",
+      "distilled": "wrong_exchange_rate_for_cash_withdrawal"
+    },
+    {
+      "example_id": "d21f30efe78abc18",
+      "gold": "wrong_exchange_rate_for_cash_withdrawal",
+      "strong": "wrong_exchange_rate_for_cash_withdrawal",
+      "distilled": "wrong_exchange_rate_for_cash_withdrawal"
+    },
+    {
+      "example_id": "96322525e221a887",
+      "gold": "wrong_exchange_rate_for_cash_withdrawal",
+      "strong": "wrong_exchange_rate_for_cash_withdrawal",
+      "distilled": "wrong_exchange_rate_for_cash_withdrawal"
+    },
+    {
+      "example_id": "26a32bddc74cd231",
+      "gold": "wrong_exchange_rate_for_cash_withdrawal",
+      "strong": "cash_withdrawal_charge",
+      "distilled": "cash_withdrawal_charge"
+    },
+    {
+      "example_id": "ab70e500f637135d",
+      "gold": "virtual_card_not_working",
+      "strong": "virtual_card_not_working",
+      "distilled": "declined_card_payment"
+    },
+    {
+      "example_id": "11f6eda34c45edbb",
+      "gold": "wrong_exchange_rate_for_cash_withdrawal",
+      "strong": "wrong_exchange_rate_for_cash_withdrawal",
+      "distilled": "exchange_rate"
+    },
+    {
+      "example_id": "ab42a0a3fb48d3e6",
+      "gold": "wrong_exchange_rate_for_cash_withdrawal",
+      "strong": "wrong_exchange_rate_for_cash_withdrawal",
+      "distilled": "wrong_exchange_rate_for_cash_withdrawal"
+    },
+    {
+      "example_id": "fd6f99007bdbd811",
+      "gold": "virtual_card_not_working",
+      "strong": "virtual_card_not_working",
+      "distilled": "virtual_card_not_working"
+    },
+    {
+      "example_id": "a111f332bd08d722",
+      "gold": "wrong_exchange_rate_for_cash_withdrawal",
+      "strong": "wrong_exchange_rate_for_cash_withdrawal",
+      "distilled": "wrong_exchange_rate_for_cash_withdrawal"
+    },
+    {
+      "example_id": "63d32ee1da8b7d36",
+      "gold": "wrong_exchange_rate_for_cash_withdrawal",
+      "strong": "cash_withdrawal_charge",
+      "distilled": "cash_withdrawal_charge"
+    },
+    {
+      "example_id": "d75780fd652c5b5d",
+      "gold": "virtual_card_not_working",
+      "strong": "virtual_card_not_working",
+      "distilled": "read_your_card_payment_fee"
+    },
+    {
+      "example_id": "a0dcfbbd8a4f4ebf",
+      "gold": "wrong_exchange_rate_for_cash_withdrawal",
+      "strong": "wrong_exchange_rate_for_cash_withdrawal",
+      "distilled": "wrong_exchange_rate_for_cash_withdrawal"
+    },
+    {
+      "example_id": "61e39fd5639844cd",
+      "gold": "wrong_exchange_rate_for_cash_withdrawal",
+      "strong": "wrong_exchange_rate_for_cash_withdrawal",
+      "distilled": "wrong_exchange_rate_for_cash_withdrawal"
+    },
+    {
+      "example_id": "a46929a252aadf32",
+      "gold": "wrong_exchange_rate_for_cash_withdrawal",
+      "strong": "wrong_exchange_rate_for_cash_withdrawal",
+      "distilled": "wrong_exchange_rate_for_cash_withdrawal"
+    },
+    {
+      "example_id": "94d90073dca50e39",
+      "gold": "wrong_exchange_rate_for_cash_withdrawal",
+      "strong": "wrong_exchange_rate_for_cash_withdrawal",
+      "distilled": "wrong_exchange_rate_for_cash_withdrawal"
+    },
+    {
+      "example_id": "31909e9c5da2eefb",
+      "gold": "wrong_exchange_rate_for_cash_withdrawal",
+      "strong": "wrong_amount_of_cash_received",
+      "distilled": "exchange_rate"
+    },
+    {
+      "example_id": "35879318260a8f5b",
+      "gold": "wrong_exchange_rate_for_cash_withdrawal",
+      "strong": "wrong_exchange_rate_for_cash_withdrawal",
+      "distilled": "wrong_exchange_rate_for_cash_withdrawal"
+    },
+    {
+      "example_id": "925dd2b52532f567",
+      "gold": "cancel_transfer",
+      "strong": "cancel_transfer",
+      "distilled": "cancel_transfer"
+    },
+    {
+      "example_id": "b04806b077134b68",
+      "gold": "cancel_transfer",
+      "strong": "cancel_transfer",
+      "distilled": "cancel_transfer"
+    },
+    {
+      "example_id": "6a1da12a931677c6",
+      "gold": "cancel_transfer",
+      "strong": "cancel_transfer",
+      "distilled": "cancel_transfer"
+    },
+    {
+      "example_id": "402201a4aa643d32",
+      "gold": "cancel_transfer",
+      "strong": "cancel_transfer",
+      "distilled": "cancel_transfer"
+    },
+    {
+      "example_id": "ef14266a5e397834",
+      "gold": "cancel_transfer",
+      "strong": "cancel_transfer",
+      "distilled": "cancel_transfer"
+    },
+    {
+      "example_id": "b4859226acc9d007",
+      "gold": "cancel_transfer",
+      "strong": "cancel_transfer",
+      "distilled": "cancel_transfer"
+    },
+    {
+      "example_id": "39c6e5cc48b9e604",
+      "gold": "cancel_transfer",
+      "strong": "cancel_transfer",
+      "distilled": "cancel_transfer"
+    },
+    {
+      "example_id": "d2583a5ca8aa5a80",
+      "gold": "cancel_transfer",
+      "strong": "cancel_transfer",
+      "distilled": "cancel_transfer"
+    },
+    {
+      "example_id": "c81eaa92793f2a88",
+      "gold": "cancel_transfer",
+      "strong": "cancel_transfer",
+      "distilled": "cancel_transfer"
+    },
+    {
+      "example_id": "2a389f29241e52bb",
+      "gold": "cancel_transfer",
+      "strong": "cancel_transfer",
+      "distilled": "cancel_transfer"
+    },
+    {
+      "example_id": "b59a9148b2f5e140",
+      "gold": "cancel_transfer",
+      "strong": "cancel_transfer",
+      "distilled": "adjust_payment"
+    },
+    {
+      "example_id": "c55b60ab4262c9b2",
+      "gold": "cancel_transfer",
+      "strong": "cancel_transfer",
+      "distilled": "cancel_transfer"
+    },
+    {
+      "example_id": "40c57a9e3cd34701",
+      "gold": "cancel_transfer",
+      "strong": "cancel_transfer",
+      "distilled": "cancel_transfer"
+    },
+    {
+      "example_id": "911e9044e410f817",
+      "gold": "cancel_transfer",
+      "strong": "cancel_transfer",
+      "distilled": "cancel_transfer"
+    },
+    {
+      "example_id": "39ea100707866542",
+      "gold": "cancel_transfer",
+      "strong": "cancel_transfer",
+      "distilled": "cancel_transfer"
+    },
+    {
+      "example_id": "357acb1ed8de8fc9",
+      "gold": "cancel_transfer",
+      "strong": "cancel_transfer",
+      "distilled": "cancel_transfer"
+    },
+    {
+      "example_id": "923121e455120ee0",
+      "gold": "cancel_transfer",
+      "strong": "cancel_transfer",
+      "distilled": "cancel_transfer"
+    },
+    {
+      "example_id": "b235d9734b9102b5",
+      "gold": "cancel_transfer",
+      "strong": "cancel_transfer",
+      "distilled": "cancel_transfer"
+    },
+    {
+      "example_id": "39bc0fc901ac318e",
+      "gold": "cancel_transfer",
+      "strong": "cancel_transfer",
+      "distilled": "cancel_transfer"
+    },
+    {
+      "example_id": "cd0a2a9b7fd2bb1e",
+      "gold": "cancel_transfer",
+      "strong": "cancel_transfer",
+      "distilled": "cancel_transfer"
+    },
+    {
+      "example_id": "99c81ac0d66652da",
+      "gold": "cancel_transfer",
+      "strong": "cancel_transfer",
+      "distilled": "cancel_transfer"
+    },
+    {
+      "example_id": "c4b03c3a6913397f",
+      "gold": "cancel_transfer",
+      "strong": "cancel_transfer",
+      "distilled": "cancel_transfer"
+    },
+    {
+      "example_id": "2ed49de3176c32c5",
+      "gold": "cancel_transfer",
+      "strong": "cancel_transfer",
+      "distilled": "cancel_transfer"
+    },
+    {
+      "example_id": "7f98a1b5ef68f9cb",
+      "gold": "cancel_transfer",
+      "strong": "cancel_transfer",
+      "distilled": "cancel_transfer"
+    },
+    {
+      "example_id": "f0f0f6dbec66d648",
+      "gold": "cancel_transfer",
+      "strong": "cancel_transfer",
+      "distilled": "cancel_transfer"
+    },
+    {
+      "example_id": "61eda8312247a7d8",
+      "gold": "cash_withdrawal_charge",
+      "strong": "cash_withdrawal_charge",
+      "distilled": "cash_withdrawal_charge"
+    },
+    {
+      "example_id": "d4fd0b18e4ae05bb",
+      "gold": "cash_withdrawal_charge",
+      "strong": "cash_withdrawal_charge",
+      "distilled": "cash_withdrawal_charge"
+    },
+    {
+      "example_id": "0bdf08924e579c58",
+      "gold": "cash_withdrawal_charge",
+      "strong": "cash_withdrawal_charge",
+      "distilled": "cash_withdrawal_charge"
+    },
+    {
+      "example_id": "972a6eda03777979",
+      "gold": "cash_withdrawal_charge",
+      "strong": "cash_withdrawal_charge",
+      "distilled": "cash_withdrawal_charge"
+    },
+    {
+      "example_id": "5e55cab4d740a7f6",
+      "gold": "cash_withdrawal_charge",
+      "strong": "cash_withdrawal_charge",
+      "distilled": "cash_withdrawal_charge"
+    },
+    {
+      "example_id": "f28dbb40f4fbc109",
+      "gold": "cash_withdrawal_charge",
+      "strong": "cash_withdrawal_charge",
+      "distilled": "cash_withdrawal_charge"
+    },
+    {
+      "example_id": "b22ea784ff20428f",
+      "gold": "cash_withdrawal_charge",
+      "strong": "cash_withdrawal_charge",
+      "distilled": "cash_withdrawal_charge"
+    },
+    {
+      "example_id": "61eb8c386f2cae1f",
+      "gold": "cash_withdrawal_charge",
+      "strong": "cash_withdrawal_charge",
+      "distilled": "cash_withdrawal_charge"
+    },
+    {
+      "example_id": "a41878a7eefda5fb",
+      "gold": "cash_withdrawal_charge",
+      "strong": "cash_withdrawal_charge",
+      "distilled": "cash_withdrawal_charge"
+    },
+    {
+      "example_id": "5408b67bea9833ef",
+      "gold": "cash_withdrawal_charge",
+      "strong": "cash_withdrawal_charge",
+      "distilled": "cash_withdrawal_charge"
+    },
+    {
+      "example_id": "dce20dbb62a3e77c",
+      "gold": "cash_withdrawal_charge",
+      "strong": "cash_withdrawal_charge",
+      "distilled": "cash_withdrawal_charge"
+    },
+    {
+      "example_id": "828ad484cbbce932",
+      "gold": "cash_withdrawal_charge",
+      "strong": "cash_withdrawal_charge",
+      "distilled": "cash_withdrawal_charge"
+    },
+    {
+      "example_id": "551974c0937ad96c",
+      "gold": "cash_withdrawal_charge",
+      "strong": "cash_withdrawal_charge",
+      "distilled": "cash_withdrawal_charge"
+    },
+    {
+      "example_id": "511fe5e4fc37b448",
+      "gold": "cash_withdrawal_charge",
+      "strong": "cash_withdrawal_charge",
+      "distilled": "cash_withdrawal_charge"
+    },
+    {
+      "example_id": "327e93aa60da964c",
+      "gold": "cash_withdrawal_charge",
+      "strong": "cash_withdrawal_charge",
+      "distilled": "cash_withdrawal_charge"
+    },
+    {
+      "example_id": "dd01c3635e047870",
+      "gold": "cash_withdrawal_charge",
+      "strong": "cash_withdrawal_charge",
+      "distilled": "cash_withdrawal_charge"
+    },
+    {
+      "example_id": "60b5fa0702f84ced",
+      "gold": "cash_withdrawal_charge",
+      "strong": "cash_withdrawal_charge",
+      "distilled": "cash_withdrawal_charge"
+    },
+    {
+      "example_id": "304d31c1aae78771",
+      "gold": "cash_withdrawal_charge",
+      "strong": "cash_withdrawal_charge",
+      "distilled": "cash_withdrawal_charge"
+    },
+    {
+      "example_id": "411215aca4da406b",
+      "gold": "cash_withdrawal_charge",
+      "strong": "cash_withdrawal_charge",
+      "distilled": "cash_withdrawal_charge"
+    },
+    {
+      "example_id": "fd1397bec9aae416",
+      "gold": "apple_pay_or_google_pay",
+      "strong": "apple_pay_or_google_pay",
+      "distilled": "apple_pay_or_google_pay"
+    },
+    {
+      "example_id": "de33ce9933f833d9",
+      "gold": "apple_pay_or_google_pay",
+      "strong": "apple_pay_or_google_pay",
+      "distilled": "apple_pay_or_google_pay"
+    },
+    {
+      "example_id": "f0b8f79e55bf2005",
+      "gold": "apple_pay_or_google_pay",
+      "strong": "top_up_failed",
+      "distilled": "top_up_failed"
+    },
+    {
+      "example_id": "f9ea61cfc4fe547f",
+      "gold": "verify_my_identity",
+      "strong": "verify_my_identity",
+      "distilled": "verify_my_identity"
+    },
+    {
+      "example_id": "5803bbffbb331cc3",
+      "gold": "apple_pay_or_google_pay",
+      "strong": "apple_pay_or_google_pay",
+      "distilled": "apple_pay_or_google_pay"
+    },
+    {
+      "example_id": "a139bcb9bc66dfdc",
+      "gold": "verify_my_identity",
+      "strong": "verify_my_identity",
+      "distilled": "verify_my_identity"
+    },
+    {
+      "example_id": "7eb13bd0729e7c42",
+      "gold": "apple_pay_or_google_pay",
+      "strong": "apple_pay_or_google_pay",
+      "distilled": "apple_pay_or_google_pay"
+    },
+    {
+      "example_id": "f9cf385ea764b7a0",
+      "gold": "apple_pay_or_google_pay",
+      "strong": "apple_pay_or_google_pay",
+      "distilled": "apple_pay_or_google_pay"
+    },
+    {
+      "example_id": "0f8e44f5a9fdfa7e",
+      "gold": "apple_pay_or_google_pay",
+      "strong": "apple_pay_or_google_pay",
+      "distilled": "apple_pay_or_google_pay"
+    },
+    {
+      "example_id": "b626154a738535f1",
+      "gold": "apple_pay_or_google_pay",
+      "strong": "apple_pay_or_google_pay",
+      "distilled": "apple_pay_or_google_pay"
+    },
+    {
+      "example_id": "50d57e476d01191d",
+      "gold": "verify_my_identity",
+      "strong": "verify_my_identity",
+      "distilled": "verify_my_identity"
+    },
+    {
+      "example_id": "382c688fb839f430",
+      "gold": "apple_pay_or_google_pay",
+      "strong": "apple_pay_or_google_pay",
+      "distilled": "top_up_by_cash_or_cheque"
+    },
+    {
+      "example_id": "d641904954cdb47a",
+      "gold": "apple_pay_or_google_pay",
+      "strong": "apple_pay_or_google_pay",
+      "distilled": "apple_pay_or_google_pay"
+    },
+    {
+      "example_id": "0a59d07660ecfbed",
+      "gold": "verify_my_identity",
+      "strong": "verify_my_identity",
+      "distilled": "verify_my_identity"
+    },
+    {
+      "example_id": "4ee9cc3473f282d9",
+      "gold": "apple_pay_or_google_pay",
+      "strong": "apple_pay_or_google_pay",
+      "distilled": "apple_pay_or_google_pay"
+    },
+    {
+      "example_id": "40ce86dd6a1d3a4b",
+      "gold": "verify_my_identity",
+      "strong": "verify_my_identity",
+      "distilled": "verify_my_identity"
+    },
+    {
+      "example_id": "035a053abb2b8c1e",
+      "gold": "verify_my_identity",
+      "strong": "verify_my_identity",
+      "distilled": "verify_my_identity"
+    },
+    {
+      "example_id": "44dc8fe7f3a52814",
+      "gold": "apple_pay_or_google_pay",
+      "strong": "apple_pay_or_google_pay",
+      "distilled": "apple_pay_or_google_pay"
+    },
+    {
+      "example_id": "2925d7d48fb41ee9",
+      "gold": "verify_my_identity",
+      "strong": "verify_my_identity",
+      "distilled": "verify_my_identity"
+    },
+    {
+      "example_id": "f2bca09efcfb7dbc",
+      "gold": "verify_my_identity",
+      "strong": "verify_my_identity",
+      "distilled": "verify_my_identity"
+    },
+    {
+      "example_id": "31d6124a57d059d8",
+      "gold": "apple_pay_or_google_pay",
+      "strong": "apple_pay_or_google_pay",
+      "distilled": "apple_pay_or_google_pay"
+    },
+    {
+      "example_id": "48f99d4caee49644",
+      "gold": "verify_my_identity",
+      "strong": "verify_my_identity",
+      "distilled": "verify_my_identity"
+    },
+    {
+      "example_id": "9cf3e61c4c544edd",
+      "gold": "apple_pay_or_google_pay",
+      "strong": "apple_pay_or_google_pay",
+      "distilled": "apple_pay_or_google_pay"
+    },
+    {
+      "example_id": "b875234dea946159",
+      "gold": "apple_pay_or_google_pay",
+      "strong": "apple_pay_or_google_pay",
+      "distilled": "apple_pay_or_google_pay"
+    },
+    {
+      "example_id": "4cc0f30ec7bfbc76",
+      "gold": "apple_pay_or_google_pay",
+      "strong": "apple_pay_or_google_pay",
+      "distilled": "apple_pay_or_google_pay"
+    },
+    {
+      "example_id": "e5b0c122461b2ece",
+      "gold": "apple_pay_or_google_pay",
+      "strong": "topping_up_by_card",
+      "distilled": "top_up_by_card"
+    }
+  ]
+}
