@@ -240,16 +240,23 @@ Privacy and labelling:
 | v3 | **92.4%, an exact tie with the strong model** | FAIL |
 
 v3 fails only because the gate is underpowered: with 185 test examples the CI is ±3.8 points,
-wider than the 3-point margin. The margin isn't being loosened. Instead, every remaining unseen
-example is being replayed (Groq's free quota allows ~1,000 requests/day) for one pre-committed
-re-run of the gate.
+wider than the 3-point margin. The margin was not loosened. Instead, there was **one
+pre-committed re-run** on more held-out data. It ties again (92.4% vs 92.4%, n = 223, CI ±3.1)
+and still **FAILS**. That result stands.
 
-Until a model passes, the gateway only runs it in **shadow**. It has never served a real
-answer.
+The same new data also exposed **drift**: 90.5% of the traffic captured after the dataset was
+built had answers outside the model's 23 known intents, against 1.0% before. It also exposed a
+design blind spot:
+- Grammar-constrained decoding forces a known label, so the online validity check can never
+  catch out-of-scope inputs.
+- Only comparison with the strong model can, through shadow agreement or a sampled audit of
+  canary traffic. That's the next change to make.
+
+The distilled model therefore runs only in **shadow** and has never served a real answer.
 
 Two problems turned up along the way and are written up in the results:
 - **A sampling bug:** the traffic covered only 23 of Banking77's 77 intents. It's fixed.
-- **Groq's daily quota** limits how much teacher data can be collected.
+- **Groq's free quota** (~1,000 requests/day) limits how much teacher data can be collected.
 
 **Simulated traffic** drives it, from three public, checkable tasks: Banking77 intent
 classification, WikiSQL text-to-SQL scored by execution, and Few-NERD entity extraction to JSON.
@@ -285,7 +292,7 @@ Tests mock all provider HTTP with `respx`. No real API calls happen in tests or 
 | **M3:** `model: "auto"` routing: rules, classifier, per-key quality, reproducible eval (RouteLLM metrics) | done; classifier ≈ heuristic for this model pair (see above) |
 | **M4:** playground, dashboard, kill switch, demo keys | done; see screenshots above |
 | **M5:** traffic capture (Kafka, Postgres + Parquet), PII scrubbing, opt-in, simulated-traffic replayer | done; see "Distillation" above |
-| **M6-M10:** discovery, dataset, CPU LoRA training, llama.cpp serving, eval gate, shadow/canary/full rollout with auto-rollback | built and running; no model has passed the gate yet (see above) |
+| **M6-M10:** discovery, dataset, CPU LoRA training, llama.cpp serving, eval gate, shadow/canary/full rollout with auto-rollback | built and running; best model ties the strong model but the gate (underpowered) hasn't passed it, so it runs in shadow only |
 
 ### M1 verification
 - The official OpenAI SDK runs against the gateway (streaming and non-streaming) in tests with
