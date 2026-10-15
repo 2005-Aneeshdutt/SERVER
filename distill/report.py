@@ -18,6 +18,7 @@ import pyarrow.parquet as pq
 from sqlalchemy import select
 
 from distill.datasets import TASKS, read
+from distill.discover import load_content
 from distill.replay import KEY_ID_FILE, SENT_FILE, TASK_NAMES
 from distill.report_distill import render_distillation
 from gateway.capture.fingerprint import system_fingerprint
@@ -204,7 +205,7 @@ def main() -> None:
     (OUT / "m5_capture.json").write_text(json.dumps(data, indent=2), encoding="utf-8")
     sessions = make_sessionmaker(make_engine(settings.database_url))
     events = asyncio.run(SqlDistillAudit(sessions).recent(50))
-    distill = render_distillation(events, "banking77-intent")
+    distill = render_distillation(events, "banking77-intent", load_content())
     Path("distill/RESULTS.md").write_text(render(data, load_overhead(), distill), encoding="utf-8")
     print(json.dumps(data, indent=2))
 

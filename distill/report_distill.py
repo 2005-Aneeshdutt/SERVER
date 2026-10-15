@@ -96,7 +96,9 @@ def extended_gate(task: str) -> list[str]:
         "every remaining unseen example from the same traffic, add them all as `test_extra` "
         "(captured after training, so no model has seen them), and run the gate **once** on "
         "the combined set with the **same 3-point margin**, accepting the outcome either way. "
-        "No other re-runs, no margin change.",
+        "No other re-runs, no margin change. The builder's filters still apply to the new "
+        "examples, and most of the new traffic turned out to be out of scope (see Drift below), "
+        "so far fewer examples were added than expected.",
         "",
         "| Version | n | Distilled | Strong | Difference | 95% CI | Gate |",
         "|---|---|---|---|---|---|---|",
@@ -234,12 +236,67 @@ def audit(events: list[dict[str, Any]]) -> list[str]:
     ]
 
 
-def render_distillation(events: list[dict[str, Any]], task: str) -> list[str]:
+def drift(task: str, content: dict[str, dict[str, Any]]) -> list[str]:
+    """How much of the task's traffic, captured after the dataset was built, falls outside the
+    label set the model was trained on (measured from the strong model's own answers)."""
+    from gateway.distill.validators import validate
+
+    latest = OUT / task / "LATEST"
+    if not latest.exists():
+        return []
+    build = OUT / task / latest.read_text(encoding="utf-8").strip()
+    manifest = _json(build / "manifest.json")
+    known = {
+        json.loads(line)["source_event_id"]
+        for split in ("train", "test")
+        for line in (build / f"{split}.jsonl").read_text("utf-8").splitlines()
+    }
+    rows = [
+        r
+        for r in content.values()
+        if r["system_fingerprint"] == manifest["system_fingerprint"]
+        and r["status"] == "ok"
+        and r["served_alias"] == manifest["source_alias"]
+    ]
+    built_at = max(r["ts"] for r in rows if r["event_id"] in known)
+    before = [r for r in rows if r["ts"] <= built_at]  # all traffic up to the dataset build
+    after = [r for r in rows if r["ts"] > built_at]
+    if not after:
+        return []
+    out_before = sum(not validate(manifest["validator"], r["response_text"]) for r in before)
+    out_after = sum(not validate(manifest["validator"], r["response_text"]) for r in after)
+    labels = len(manifest["validator"]["labels"])
+    return [
+        "",
+        "### Drift: new traffic the distilled model can't handle",
+        "",
+        f"The {labels}-label set comes from the traffic the model was trained on. Of the "
+        f"{len(before)} requests captured up to the dataset build, {out_before} "
+        f"({_pct(out_before / len(before))}) had a strong-model answer outside it. Of the "
+        f"**{len(after)} requests captured after the dataset was built, {out_after} "
+        f"({_pct(out_after / len(after))})** did: the later traffic is mostly intents the model "
+        "has never seen (a side effect of the page-sampling bug, but exactly what real drift "
+        "looks like).",
+        "",
+        "**What this exposes in the design:** grammar-constrained decoding makes the distilled "
+        "model always answer with one of its known labels, so the online *validity* check can "
+        "never fire on out-of-scope inputs. The model would be confidently wrong and the "
+        "rollback signal would stay silent. Validity is not correctness. Only comparison with "
+        "the strong model catches it: shadow agreement, or a sampled share of canary/full "
+        "traffic also sent to the strong model. That audit sample is the missing rollback "
+        "input, and it is the next change to make.",
+    ]
+
+
+def render_distillation(
+    events: list[dict[str, Any]], task: str, content: dict[str, dict[str, Any]] | None = None
+) -> list[str]:
     return [
         *discovery(),
         *training(task),
         *gate(task),
         *extended_gate(task),
+        *(drift(task, content) if content else []),
         *payoff(task),
         *audit(events),
     ]
