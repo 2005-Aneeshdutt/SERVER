@@ -26,6 +26,8 @@ services:
       REDIS_URL: redis://redis:6379/0
       # Public playground keys (tiny spend cap); set DEMO_ENABLED=false to turn off.
       DEMO_ENABLED: ${DEMO_ENABLED:-true}
+      # Free-tier models only ($0 budget; a public demo lets anyone mint keys).
+      DEMO_MODELS: ${DEMO_MODELS:-groq-gpt-oss-20b,groq-gpt-oss-120b,gemini-flash-lite}
       # Reach an Ollama running on the host (optional).
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434/v1}
       # Distillation capture (off by default): CAPTURE_ENABLED=true + `--profile distill`.
@@ -198,7 +200,9 @@ services:
     #   docker compose --profile distill run --rm distill-tools python -m distill.report
     image: llm-gateway:local
     profiles: ["distill"]
-    command: ["python", "-m", "distill.report"]
+    # No-op by default: `--profile distill up` starts every profile service, and the report
+    # must only run when asked (it rewrites distill/RESULTS.md). Run real commands with `run`.
+    command: ["python", "-c", "print('usage: docker compose --profile distill run --rm distill-tools python -m distill.<module>')"]
     environment:
       DATABASE_URL: postgresql+asyncpg://gateway:gateway@postgres:5432/gateway
       KAFKA_BOOTSTRAP: kafka:9092
