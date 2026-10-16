@@ -28,7 +28,8 @@ models:
     context_window: 1048576
     tier: cheap
     supports_vision: true
-    fallbacks: [or-llama-8b]
+    # groq-gpt-oss-20b second: free-tier demo keys can't use OpenRouter, and still fail over.
+    fallbacks: [or-llama-8b, groq-gpt-oss-20b]
 
   gemini-flash:
     provider: gemini
