@@ -96,3 +96,16 @@ async def test_kill_switch_requires_admin_and_a_known_provider(gateway: Gateway)
 
 async def test_demo_keys_are_off_unless_enabled(gateway: Gateway) -> None:
     assert (await gateway.client.post("/demo/keys")).status_code == 404
+
+
+def test_default_demo_models_are_free_tier_only() -> None:
+    """A public demo lets anyone mint keys and the budget is $0: no paid provider, no `auto`
+    (it routes to OpenRouter models)."""
+    from gateway.core.config import Settings
+    from gateway.routing.registry import ModelRegistry
+
+    settings = Settings(_env_file=None)
+    registry = ModelRegistry.from_yaml(settings.models_file)
+    aliases = [a.strip() for a in settings.demo_models.split(",")]
+    assert "auto" not in aliases
+    assert {registry.get(a).provider for a in aliases} <= {"groq", "gemini"}

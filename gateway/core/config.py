@@ -71,10 +71,11 @@ class Settings(BaseSettings):
     demo_rpm: int = 10
     demo_tpm: int = 20_000
     demo_keys_per_hour: int = 30
-    # Must include both models behind "auto", or demo keys could never be routed "strong".
-    demo_models: str = (
-        "auto,or-llama-8b,or-llama-70b,groq-gpt-oss-20b,groq-gpt-oss-120b,gemini-flash-lite"
-    )
+    # Free-tier models only: anyone can mint a demo key on a public link, and the budget is $0.
+    # `auto` and the OpenRouter models are excluded because OpenRouter bills per token (and the
+    # router's model pair is on OpenRouter). Fallbacks to models outside this list are filtered
+    # out per key, so a demo request can never reach a paid provider.
+    demo_models: str = "groq-gpt-oss-20b,groq-gpt-oss-120b,gemini-flash-lite"
 
     # Distillation capture (M5): publish request/response events to Kafka. Off by default;
     # needs the `capture` extra. Fails open (see docs/decisions/0015).
