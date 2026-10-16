@@ -187,11 +187,11 @@ function Shell() {
       </a>
       <header className="topbar">
         <div className="topbar__inner">
-          <button type="button" className="brand" onClick={() => setTab("overview")} aria-label="LLM Gateway home">
+          <button type="button" className="brand" onClick={() => setTab("overview")} aria-label="Switchyard home">
             <span className="brand__logo">
               <LogoMark size={18} />
             </span>
-            <span className="brand__name">LLM Gateway</span>
+            <span className="brand__name">Switchyard</span>
           </button>
           <nav className="tabs" aria-label="Sections">
             {TABS.map(({ id, label, Icon }) => (

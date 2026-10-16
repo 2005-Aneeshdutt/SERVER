@@ -1,5 +1,5 @@
 /* =============================================================================================
-   LLM Gateway — design system
+   Switchyard — design system
    Tokens first (color, type, space, radius, elevation, motion), then primitives, then views.
    Light is the default; dark applies via prefers-color-scheme unless data-theme="light" is set,
    or always when data-theme="dark" is set (the theme switch in the top bar).

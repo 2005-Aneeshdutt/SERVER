@@ -319,7 +319,7 @@ export function ArchDiagram({
         {/* gateway frame */}
         <rect x={l.frame.x} y={l.frame.y} width={l.frame.w} height={l.frame.h} rx="16" className="arch__frame" />
         <text x={l.frame.x + 18} y={l.frame.y + 28} className="arch__frame-title">
-          LLM Gateway
+          Switchyard
         </text>
         <text x={l.frame.x + 18} y={l.frame.y + 46} className="arch__frame-sub">
           FastAPI · async · stateless replicas

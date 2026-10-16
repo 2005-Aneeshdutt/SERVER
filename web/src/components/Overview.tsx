@@ -117,7 +117,7 @@ export function Overview({ onNavigate, health }: { onNavigate: (t: Tab) => void;
         <div className="hero__copy">
           <span className="hero__eyebrow">
             <StatusDot tone={health && health !== "down" ? (health.degraded ? "warn" : "ok") : "neutral"} pulse />
-            OpenAI-compatible LLM gateway
+            Switchyard · OpenAI-compatible AI gateway
           </span>
           <h1 className="hero__title">
             One endpoint for every model.
