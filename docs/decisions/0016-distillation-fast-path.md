@@ -94,6 +94,27 @@ has exact answers, so no judge is needed for this task. Those come back for free
 - **Streams always use the strong model**, because a stream can't be validated before it's
   sent. A known limitation.
 
+### Sampled audit: validity is not correctness (added after the drift finding)
+Grammar-constrained decoding makes the distilled model always emit one of its known labels. That
+removes invalid outputs, but it also blinds the validity check:
+- On intents the model never saw, it is confidently wrong, and every answer is still "valid".
+- The drift found in `distill/RESULTS.md` (90.5% of late traffic out of scope) would never have
+  triggered the validity-based rollback.
+
+The fix is a **sampled audit**:
+- In canary and full, a share of served distilled answers (`DISTILL_AUDIT_RATE`, default 5%) is
+  also sent to the strong model, in the background, with bounded concurrency.
+- Disagreements go into a **second window** using the same atomic Lua script: rollback when at
+  least 30 audits were seen and the Wilson lower bound of the disagreement rate exceeds 15%.
+- The 15% sits above the ~7% disagreement measured at the eval gate, so a healthy model isn't
+  rolled back by its normal level of disagreement.
+- A failed strong call is never counted against the model.
+- An integration test serves a model that gives only valid but wrong labels: the validity check
+  never fires, the audit rolls it back exactly once, and an agreeing model is kept.
+
+**The cost:** the audit rate is a direct trade between detection speed and strong-model spend. At
+5%, detecting a 15%+ disagreement rate takes about 30 / 0.05 = 600 distilled requests.
+
 ## What "cheaper" means here, honestly
 The distilled model has no per-token price, so list-price cost drops by the share of traffic it
 serves. Its compute is **not free**, but it isn't priced either: there's no paid host to

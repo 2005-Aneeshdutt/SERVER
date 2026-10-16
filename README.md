@@ -277,8 +277,10 @@ built had answers outside the model's 23 known intents, against 1.0% before. It 
 design blind spot:
 - Grammar-constrained decoding forces a known label, so the online validity check can never
   catch out-of-scope inputs.
-- Only comparison with the strong model can, through shadow agreement or a sampled audit of
-  canary traffic. That's the next change to make.
+- Only comparison with the strong model can. So a **sampled audit** was added: a share of
+  served distilled answers is re-checked by the strong model in the background, and
+  disagreement now triggers rollback too
+  ([ADR 0016](docs/decisions/0016-distillation-fast-path.md)).
 
 The distilled model therefore runs only in **shadow** and has never served a real answer.
 

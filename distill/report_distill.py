@@ -283,8 +283,9 @@ def drift(task: str, content: dict[str, dict[str, Any]]) -> list[str]:
         "never fire on out-of-scope inputs. The model would be confidently wrong and the "
         "rollback signal would stay silent. Validity is not correctness. Only comparison with "
         "the strong model catches it: shadow agreement, or a sampled share of canary/full "
-        "traffic also sent to the strong model. That audit sample is the missing rollback "
-        "input, and it is the next change to make.",
+        "traffic also sent to the strong model. That **sampled audit** is now a second rollback "
+        "input (ADR 0016), covered by an integration test where a model that gives only valid but "
+        "wrong labels is rolled back.",
     ]
 
 
