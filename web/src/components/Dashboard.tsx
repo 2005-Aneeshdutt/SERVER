@@ -651,7 +651,16 @@ function pipelineFor(t: DistillTask, audit: DistillAuditEvent[]): Step[] {
       return {
         id: p.id,
         label: p.label,
-        caption: gate ? `gate ${gate}${gate === "FAIL" && reached >= 0 ? " · overridden" : ""}` : "passed",
+        // Shadow never serves users, so it's allowed without a passing gate: say "shadow only",
+        // not "overridden". Only canary/full on a failed gate is a real override.
+        caption:
+          gate === "FAIL"
+            ? t.state === "canary" || t.state === "full"
+              ? "gate FAIL · promoted anyway"
+              : "gate FAIL · shadow only"
+            : gate === "PASS"
+              ? "gate PASS"
+              : "not recorded",
         state: gate === "FAIL" ? "warn" : t.state === "off" ? "current" : "done",
         when: registered ? ago(registered.ts) : undefined,
       };
