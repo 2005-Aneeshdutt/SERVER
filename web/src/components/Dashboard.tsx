@@ -734,6 +734,8 @@ function DistillPanel({ tasks, audit }: { tasks: DistillTask[]; audit: DistillAu
             const agree = t.shadow_n ? t.shadow_agree / t.shadow_n : null;
             const valid = t.shadow_n ? t.shadow_valid / t.shadow_n : null;
             const fail = t.window_n ? t.window_failures / t.window_n : null;
+            const auditN = t.audit_n ?? 0;
+            const disagree = auditN ? (t.audit_disagree ?? 0) / auditN : null;
             return (
               <article key={t.system_fingerprint} className="distill-task">
                 <header className="distill-task__head">
@@ -789,6 +791,14 @@ function DistillPanel({ tasks, audit }: { tasks: DistillTask[]; audit: DistillAu
                       <strong>{fail === null ? "—" : pct(fail)}</strong>
                       <span className="muted small">of {count(t.window_n)}</span>
                       <Meter value={fail} tone={fail !== null && fail > 0.05 ? "bad" : "ok"} label="Online failure rate" />
+                    </dd>
+                  </div>
+                  <div title="A sample of served answers re-checked against the strong model. Catches confidently wrong answers that are still valid labels.">
+                    <dt>Audit disagreement · 10 min</dt>
+                    <dd>
+                      <strong>{disagree === null ? "—" : pct(disagree)}</strong>
+                      <span className="muted small">of {count(auditN)}</span>
+                      <Meter value={disagree} tone={disagree !== null && disagree > 0.15 ? "bad" : "ok"} label="Audit disagreement rate" />
                     </dd>
                   </div>
                 </dl>

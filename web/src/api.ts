@@ -428,6 +428,9 @@ export interface DistillTask {
   shadow_agree: number;
   window_n: number;
   window_failures: number;
+  /** Sampled audit against the strong model (canary/full), over the same window. */
+  audit_n?: number;
+  audit_disagree?: number;
 }
 
 export interface DistillAuditEvent {
