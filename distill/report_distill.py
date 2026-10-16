@@ -289,6 +289,39 @@ def drift(task: str, content: dict[str, dict[str, Any]]) -> list[str]:
     ]
 
 
+def drift_demo(task: str) -> list[str]:
+    d = _json(RESULTS / f"drift_{task}.json")
+    if not d:
+        return []
+    rows = d["timeline"]
+    first_drift = next((r["i"] for r in rows if r["phase"] == "drift"), None)
+    rollback = next((r for r in rows if r["state"] == "rolled_back"), None)
+    served_in = [r for r in rows if r["phase"] == "in_distribution"]
+    distilled_in = sum((r["served"] or "").startswith("distilled") for r in served_in)
+    lines = [
+        "",
+        "## M12: drift demo (simulated traffic)",
+        "",
+        f"![drift](results/drift_{task}.svg)",
+        "",
+        f"- Start state: **{d['start']['state']}** at {d['start']['weight']:.0%} traffic. "
+        f"Phase A: {len(served_in)} in-distribution requests, {distilled_in} served by the "
+        f"distilled model. Phase B: {len(rows) - len(served_in)} requests for intents it never "
+        "saw (from request "
+        f"#{first_drift}).",
+    ]
+    if rollback is not None:
+        lines.append(
+            f"- **Automatic rollback at request #{rollback['i']}** "
+            f"({rollback['i'] - (first_drift or 0)} requests into the drift), on "
+            f"{rollback['audit_disagree']}/{rollback['audit_n']} audit disagreements; after it, "
+            "requests went back to the strong model."
+        )
+    else:
+        lines.append("- **No rollback happened** during the run.")
+    return lines
+
+
 def render_distillation(
     events: list[dict[str, Any]], task: str, content: dict[str, dict[str, Any]] | None = None
 ) -> list[str]:
@@ -298,6 +331,7 @@ def render_distillation(
         *gate(task),
         *extended_gate(task),
         *(drift(task, content) if content else []),
+        *drift_demo(task),
         *payoff(task),
         *audit(events),
     ]
