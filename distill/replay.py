@@ -105,11 +105,20 @@ def create_key(gateway: str) -> None:
     print(f"created simulated, opted-in key {response.json()['key_prefix']}... -> {KEY_FILE}")
 
 
-def _sent() -> set[str]:
+def _sent(requeue: set[str] | None = None) -> set[str]:
+    """Example ids already served OK, minus any explicitly requeued (e.g. requests that were
+    served while capture was off, so their data never reached the dataset)."""
     if not SENT_FILE.exists():
         return set()
     rows = [json.loads(line) for line in SENT_FILE.read_text("utf-8").splitlines() if line]
-    return {r["example_id"] for r in rows if r["status"] == 200}
+    return {r["example_id"] for r in rows if r["status"] == 200} - (requeue or set())
+
+
+def _check_capture(client: httpx.Client) -> None:
+    """Replayed traffic exists to be captured: refuse to send it to a gateway that isn't."""
+    ready = client.get("/readyz").json()
+    if not ready.get("capture_enabled"):
+        sys.exit("gateway capture is OFF: start it with scripts/distill-up.sh, then re-run")
 
 
 def _interleave(tasks: list[str], limit: int, done: set[str]) -> list[TaskExample]:
@@ -146,18 +155,23 @@ def send(client: httpx.Client, example: TaskExample, target: Target) -> httpx.Re
     return response
 
 
-def run(gateway: str, tasks: list[str], limit: int, rpm: float) -> None:
+def run(
+    gateway: str, tasks: list[str], limit: int, rpm: float, requeue: set[str] | None = None
+) -> None:
     if not KEY_FILE.exists():
         sys.exit(f"no replay key: run `python -m distill.replay key` first ({KEY_FILE})")
     key = KEY_FILE.read_text(encoding="utf-8").strip()
-    todo = _interleave(tasks, limit, _sent())
+    todo = _interleave(tasks, limit, _sent(requeue))
     print(f"{len(todo)} requests to send ({', '.join(tasks)}); paced at {rpm} rpm", flush=True)
     stats: Counter[str] = Counter()
     headers = {"Authorization": f"Bearer {key}", "X-Gateway-Simulated": "1"}
     interval = 60.0 / rpm
     next_paced = 0.0
     with httpx.Client(base_url=gateway, headers=headers, timeout=180) as client:
+        _check_capture(client)
         for i, example in enumerate(todo, 1):
+            if i % 25 == 0:
+                _check_capture(client)
             target = TARGETS[example.task]
             if target.paced:
                 time.sleep(max(0.0, next_paced - time.monotonic()))
@@ -195,6 +209,7 @@ def main() -> None:
     r.add_argument("--tasks", default=",".join(TASK_NAMES))
     r.add_argument("--limit", type=int, default=100, help="max new requests per task")
     r.add_argument("--rpm", type=float, default=10.0, help="pace for free-tier requests")
+    r.add_argument("--requeue", type=Path, help="JSON list of example ids to send again")
     args = parser.parse_args()
     REPLAY.mkdir(parents=True, exist_ok=True)
     if args.cmd == "prepare":
@@ -202,7 +217,8 @@ def main() -> None:
     elif args.cmd == "key":
         create_key(args.gateway)
     else:
-        run(args.gateway, args.tasks.split(","), args.limit, args.rpm)
+        requeue = set(json.loads(args.requeue.read_text("utf-8"))) if args.requeue else None
+        run(args.gateway, args.tasks.split(","), args.limit, args.rpm, requeue)
 
 
 if __name__ == "__main__":
