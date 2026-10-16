@@ -35,7 +35,15 @@ flowchart LR
     API -. submit, non-blocking .-> Q[[bounded log queue]]
     Q -->|batched inserts| PG
     API --> M[/metrics Prometheus/]
+    API -. capture: scrub PII, batch .-> K[[Kafka<br/>gateway.events.v1]]
+    K --> CC[capture consumer] --> PQ[(Parquet + Postgres<br/>metadata)]
+    PQ --> DS[discover → dataset → LoRA train<br/>→ GGUF → eval gate]
+    DS --> LC[llama.cpp<br/>distilled model]
+    D -->|rollout: shadow / canary / full<br/>auto-rollback in Redis| LC
 ```
+
+The dashed paths are off by default (`CAPTURE_ENABLED`, `DISTILL_ROLLOUT_ENABLED`); see
+"Distillation" below.
 
 - **Adapters** translate OpenAI format ⇄ native format, including streaming events, tool calls,
   images and token usage. They normalize upstream errors into `RateLimited`, `ProviderUnavailable`,
@@ -72,30 +80,50 @@ available, limiter down, or replica overloaded (with `Retry-After`).
 
 Design decisions: [`docs/decisions/`](docs/decisions/)
 
-## Playground and dashboard
+## The UI: overview, playground and dashboard
 
-Open **http://localhost:8000** once the stack is up.
+Open **http://localhost:8000** once the stack is up. Press **Ctrl/Cmd+K** anywhere for the
+command palette.
+
+![Overview](docs/images/overview.png)
+
+The **Overview** is the landing page:
+- live 24-hour stats;
+- an animated architecture diagram, where each real request from the live feed travels the path
+  it actually took (cache hits stop at the cache, errors turn red);
+- system status, and a copyable OpenAI SDK snippet.
 
 ![Playground](docs/images/playground.png)
 
 The **Playground**:
-- **Get demo key** issues a throwaway key ($0.02 cap, 10 requests/min).
-- Pick `auto` or any alias and send a prompt. The panel shows the route and why, which provider
-  served it, the fallback path, cache status, cost, latency, time to first token and the
-  gateway's own overhead.
+- **Get demo key** issues a throwaway key: free-tier models only, $0.02 cap, 10 requests/min.
+- Send a prompt and get a **request trace**: auth and limits, cache, router, provider and
+  stream as stages, plus a waterfall of gateway overhead vs provider time vs network vs
+  streaming. It's built from the gateway's own `Server-Timing` and `X-Gateway-*` headers.
+- **Compare** sends the same prompt to two models in parallel and shows latency, cost and
+  answers side by side.
 - **Simulate an outage** skips a provider *for that request only*, so you can watch failover
   without affecting anyone else.
 
 ![Dashboard](docs/images/dashboard.png)
 
 The **Dashboard** (needs `ADMIN_TOKEN`):
-- requests, spend, cache hit rate, failovers and latency, read from the Postgres replica
-- provider health with a **Take down** switch that forces a real failover for all traffic
-- usage by key and model, a live request feed, and key management
+- requests, spend, cache hit rate, failovers and latency, read from the Postgres replica (with
+  its real replication lag);
+- provider health with a **Take down** switch that forces a real failover for all traffic;
+- the **distillation pipeline** per task (capture → discover → dataset → train → eval gate →
+  shadow → canary → full), with live shadow and online-failure stats and the rollout audit
+  trail;
+- usage by key and model, a live request feed, and key management.
 
-The UI is React + TypeScript + Vite with no other runtime dependencies: charts are hand-written
-SVG. nginx serves it from the same origin as the API. Design notes:
+The UI is React + TypeScript + Vite with **no other runtime dependencies**: charts, the diagram
+and the icons are hand-written SVG. nginx serves it from the same origin as the API. Design notes:
 [ADR 0013](docs/decisions/0013-public-demo-and-kill-switch.md).
+
+**Share it publicly ($0):** `powershell -File scripts\public-demo.ps1` opens a Cloudflare quick
+tunnel to the running stack and prints an `https://….trycloudflare.com` link. The link changes on
+each start and only works while this machine is on. Demo keys can only use free-tier models, so a
+public link can't cost money.
 
 ## Run it
 
