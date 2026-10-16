@@ -1,6 +1,7 @@
 """Hugging Face datasets-server REST API (no `datasets` dependency), as eval/data.py uses."""
 
 import random
+import time
 from collections.abc import Callable, Iterator
 from typing import Any
 
@@ -20,7 +21,11 @@ def _page(
         "offset": offset,
         "length": PAGE,
     }
-    response = client.get(ROWS_URL, params=params, timeout=60)
+    for attempt in range(6):  # the public API rate-limits bursts (429): back off and retry
+        response = client.get(ROWS_URL, params=params, timeout=60)
+        if response.status_code not in (429, 502, 503):
+            break
+        time.sleep(float(response.headers.get("retry-after") or 2 * 2**attempt))
     response.raise_for_status()
     data: dict[str, Any] = response.json()
     return data

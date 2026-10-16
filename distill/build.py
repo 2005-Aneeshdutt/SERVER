@@ -24,7 +24,7 @@ from typing import Any
 
 from sqlalchemy import select
 
-from distill.datasets import TASKS, read
+from distill.datasets import TASKS
 from distill.discover import OUT, load_content
 from gateway.core.config import Settings
 from gateway.db.models import CaptureEventRow
@@ -52,9 +52,15 @@ def _user_text(row: dict[str, Any]) -> str:
 
 
 def gold_by_text(task: str) -> dict[str, str]:
-    if not (TASKS / f"{task}.jsonl").exists():
-        return {}
-    return {e.messages[-1]["content"]: e.gold for e in read(task)}
+    """User text -> gold label, from the task file and any earlier versions of it
+    (`<task>.<label>.jsonl`, e.g. the page-sampled set replayed before the sampling fix)."""
+    gold: dict[str, str] = {}
+    for path in [*sorted(TASKS.glob(f"{task}.*.jsonl")), TASKS / f"{task}.jsonl"]:
+        if path.exists():
+            for line in path.read_text(encoding="utf-8").splitlines():
+                row = json.loads(line)
+                gold[row["messages"][-1]["content"]] = row["gold"]
+    return gold
 
 
 def build(
