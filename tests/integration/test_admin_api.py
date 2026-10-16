@@ -118,7 +118,9 @@ async def test_demo_key_is_capped_and_scoped(client: httpx.AsyncClient) -> None:
     body = created.json()
     assert body["key"].startswith("gw-") and body["name"].startswith("demo-")
     assert body["monthly_spend_cap_usd"] == "0.02" and body["rpm_limit"] == 10
-    assert "auto" in body["allowed_models"]
+    # Free-tier models only: a public demo lets anyone mint keys and the budget is $0.
+    assert "auto" not in body["allowed_models"]
+    assert all(not m.startswith("or-") for m in body["allowed_models"])
     listed = (await client.get("/admin/keys", headers=ADMIN)).json()
     mine = next(k for k in listed if k["name"] == body["name"])
     assert mine["monthly_spend_cap_usd"] == "0.020000"
