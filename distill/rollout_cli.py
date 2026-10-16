@@ -88,8 +88,11 @@ def set_state(gateway: str, name: str, state: str, weight: float, reason: str) -
         print(response.json())
 
 
-def status(gateway: str) -> None:
+def status(gateway: str, as_json: bool = False) -> None:
     with _client(gateway) as client:
+        if as_json:
+            print(json.dumps({"tasks": client.get("/admin/distill/tasks").json()}))
+            return
         print(json.dumps(client.get("/admin/distill/tasks").json(), indent=2))
         print(json.dumps(client.get("/admin/distill/audit?limit=10").json(), indent=2))
 
@@ -107,14 +110,15 @@ def main() -> None:
     s.add_argument("state", choices=["off", "shadow", "canary", "full", "rolled_back"])
     s.add_argument("--weight", type=float, default=0.0)
     s.add_argument("--reason", default="cli")
-    sub.add_parser("status")
+    st = sub.add_parser("status")
+    st.add_argument("--json", action="store_true", help="machine-readable (for distill.pipeline)")
     args = parser.parse_args()
     if args.cmd == "register":
         register(args.gateway, args.task, args.alias, args.version)
     elif args.cmd == "state":
         set_state(args.gateway, args.task, args.state, args.weight, args.reason)
     else:
-        status(args.gateway)
+        status(args.gateway, args.json)
 
 
 if __name__ == "__main__":
