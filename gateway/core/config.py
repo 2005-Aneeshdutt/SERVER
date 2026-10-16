@@ -92,6 +92,9 @@ class Settings(BaseSettings):
     distill_min_samples: int = 50
     distill_failure_threshold: float = 0.05
     distill_shadow_concurrency: int = 4
+    distill_audit_rate: float = 0.05
+    distill_audit_min_samples: int = 30
+    distill_audit_threshold: float = 0.15
 
     cache_ttl_s: float = 3600.0
     # Max time a request waits for an identical in-flight request before calling upstream itself.

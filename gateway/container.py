@@ -175,6 +175,9 @@ def _rollout(
         min_samples=settings.distill_min_samples,
         failure_threshold=settings.distill_failure_threshold,
         shadow_concurrency=settings.distill_shadow_concurrency,
+        audit_rate=settings.distill_audit_rate,
+        audit_min_samples=settings.distill_audit_min_samples,
+        audit_threshold=settings.distill_audit_threshold,
     )
     return RolloutController(redis, registry, providers, audit.write, config)
 

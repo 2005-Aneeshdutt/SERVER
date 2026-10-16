@@ -17,6 +17,11 @@ Arms:
 - canary/full: with probability `weight`, the distilled model serves. Its answer is validated;
   an invalid answer is re-served by the strong model in the same request and counts as a
   failure. Failures feed the atomic rollback check in Lua.
+- audit (canary/full): a sampled share (`audit_rate`) of the answers the distilled model served
+  is also sent to the strong model in the background and compared. Validity alone can't catch a
+  model that is *confidently wrong* (grammar-constrained decoding always yields a known label,
+  e.g. on intents it never saw: the drift found in distill/RESULTS.md). Disagreements feed a
+  second atomic rollback check with its own window and threshold.
 Streaming requests always go to the strong model (a stream can't be validated before sending).
 """
 
@@ -88,6 +93,13 @@ class RolloutConfig:
     min_samples: int = 50
     failure_threshold: float = 0.05
     shadow_concurrency: int = 4
+    # Sampled audit against the strong model (canary/full): roll back when, over the window,
+    # at least `audit_min_samples` audited answers were seen and the 95% Wilson lower bound of
+    # the disagreement rate exceeds `audit_threshold`. The threshold must sit above the
+    # disagreement measured at the eval gate (v3: ~7%), or a healthy model would be rolled back.
+    audit_rate: float = 0.05
+    audit_min_samples: int = 30
+    audit_threshold: float = 0.15
 
 
 def task_key(fp: str) -> str:
@@ -96,6 +108,10 @@ def task_key(fp: str) -> str:
 
 def window_key(fp: str) -> str:
     return f"distill:window:{{{fp}}}"
+
+
+def audit_window_key(fp: str) -> str:
+    return f"distill:audit:{{{fp}}}"
 
 
 class RolloutController:
@@ -171,9 +187,15 @@ class RolloutController:
         window = {
             _text(k): int(_text(v)) for k, v in (await self._redis.hgetall(window_key(fp))).items()
         }
+        audits = {
+            _text(k): int(_text(v))
+            for k, v in (await self._redis.hgetall(audit_window_key(fp))).items()
+        }
         minute = int(time.time() // 60)
         recent = range(minute - self._config.window_minutes + 1, minute + 1)
         return {
+            "audit_n": sum(audits.get(f"{m}:n", 0) for m in recent),
+            "audit_disagree": sum(audits.get(f"{m}:f", 0) for m in recent),
             "shadow_n": int(h.get("shadow_n", 0)),
             "shadow_valid": int(h.get("shadow_valid", 0)),
             "shadow_agree": int(h.get("shadow_agree", 0)),
@@ -228,6 +250,58 @@ class RolloutController:
 
     def validate(self, task: TaskRollout, text: str | None) -> bool:
         return validate(task.validator, text)
+
+    def audit(self, task: TaskRollout, body: ChatRequest, distilled_text: str | None) -> None:
+        """Maybe (with probability audit_rate) compare a served distilled answer with the
+        strong model, off the request path. Bounded by the shadow concurrency slots."""
+        if self._rng() >= self._config.audit_rate:
+            return
+        if self._shadow_slots.locked():
+            DISTILL_REQUESTS.labels(task.task, "audit_skipped").inc()
+            return
+        self._spawn(self._compare_with_strong(task, body, distilled_text))
+
+    async def _compare_with_strong(
+        self, task: TaskRollout, body: ChatRequest, distilled_text: str | None
+    ) -> None:
+        async with self._shadow_slots:
+            spec = self._registry.get(task.source_alias)
+            provider = self._providers.get(spec.provider)
+            if provider is None:
+                return
+            try:
+                response = await provider.complete(body, spec)
+            except Exception:
+                DISTILL_REQUESTS.labels(task.task, "audit_error").inc()
+                return  # no strong answer, no verdict: never count it against the model
+            strong = response.choices[0].message.content if response.choices else None
+            agree = _same(distilled_text, strong)
+            DISTILL_REQUESTS.labels(task.task, "audit_agree" if agree else "audit_disagree").inc()
+            c = self._config
+            try:
+                rolled, n, disagreements = await self._record(
+                    keys=[task_key(task.fingerprint), audit_window_key(task.fingerprint)],
+                    args=[
+                        int(not agree),
+                        c.window_minutes,
+                        c.audit_min_samples,
+                        c.audit_threshold,
+                        1.96,
+                    ],
+                )
+            except RedisError:
+                REDIS_ERRORS.labels(component="distill_rollout").inc()
+                return
+            if rolled:
+                DISTILL_REQUESTS.labels(task.task, "rolled_back").inc()
+                reason = (
+                    f"auto: audit disagreed with {task.source_alias} on {disagreements}/{n} "
+                    f"sampled answers in {c.window_minutes} min"
+                )
+                await self._audit_event(
+                    task.task, task.fingerprint, "rollback", "rolled_back", 0.0, "auto", reason
+                )
+                await self.tasks(force=True)
 
     def shadow(self, task: TaskRollout, body: ChatRequest, strong_text: str | None) -> None:
         """Compare the distilled model with the strong answer, off the request path."""

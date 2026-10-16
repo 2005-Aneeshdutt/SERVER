@@ -15,7 +15,13 @@ from redis.asyncio import Redis
 
 from gateway.core.auth import hash_key
 from gateway.core.config import Settings
-from gateway.distill.rollout import RolloutConfig, RolloutController, task_key, window_key
+from gateway.distill.rollout import (
+    RolloutConfig,
+    RolloutController,
+    audit_window_key,
+    task_key,
+    window_key,
+)
 from gateway.providers.llamacpp import LlamaCppProvider
 from tests.conftest import API_KEY, Gateway
 from tests.helpers import GROQ_URL, openai_completion
@@ -45,7 +51,7 @@ async def redis() -> AsyncIterator[Redis]:
     fp = system_fingerprint([ChatMessage(role="system", content=SYSTEM)])
     assert fp is not None
     await client.srem("distill:tasks", fp)
-    await client.delete(task_key(fp), window_key(fp))
+    await client.delete(task_key(fp), window_key(fp), audit_window_key(fp))
     await client.aclose()
 
 
@@ -81,7 +87,7 @@ async def setup(
     fp = system_fingerprint([ChatMessage(role="system", content=SYSTEM)])
     assert fp is not None
     # A fresh fingerprint namespace per test: these keys are shared Redis state.
-    await redis.delete(task_key(fp), window_key(fp))
+    await redis.delete(task_key(fp), window_key(fp), audit_window_key(fp))
     await rollout.register(
         {
             "task": f"bank-intent-{uuid.uuid4().hex[:6]}",
@@ -201,3 +207,53 @@ async def test_no_rollback_below_min_samples_or_when_healthy(
     # stays below the 5% threshold, so a healthy model isn't rolled back by noise.
     assert not any([await rollout.record(task, ok=i % 20 != 0) for i in range(200)])
     assert (await redis.hget(task_key(fp), "state")) == b"full"
+
+
+async def test_sampled_audit_rolls_back_a_confidently_wrong_model(
+    gateway: Gateway, upstream: respx.Router, redis: Redis, http_client: httpx.AsyncClient
+) -> None:
+    """Every distilled answer is a *valid* label, so the validity check never fires, but it
+    disagrees with the strong model: only the sampled audit can catch this (the drift case)."""
+    rollout, fp, audit = await setup(
+        gateway, http_client, redis, audit_rate=1.0, audit_min_samples=8, audit_threshold=0.15
+    )
+    await rollout.set_state(fp, "full", 1.0, actor="test", reason="go")
+    upstream.post(LLAMA_URL).mock(
+        return_value=httpx.Response(200, json=openai_completion("card_arrival"))
+    )
+    upstream.post(GROQ_URL).mock(
+        return_value=httpx.Response(200, json=openai_completion("lost_or_stolen_card"))
+    )
+    served = []
+    for i in range(12):
+        r = await gateway.client.post("/v1/chat/completions", json=body(f"q{i}"))
+        served.append(r.headers["x-gateway-alias"])
+        await asyncio.sleep(0.05)  # let background audits land
+    await rollout.close()
+
+    assert served[0] == "distilled-banking77-intent-v1"  # served (and valid) at first
+    assert (await redis.hget(task_key(fp), "state")) == b"rolled_back"
+    rollbacks = [e for e in audit.events if e["action"] == "rollback"]
+    assert len(rollbacks) == 1 and "audit disagreed" in rollbacks[0]["reason"]
+    after = await gateway.client.post("/v1/chat/completions", json=body("after"))
+    assert after.headers["x-gateway-alias"] == "groq-gpt-oss-120b"  # strong model again
+
+
+async def test_sampled_audit_keeps_an_agreeing_model(
+    gateway: Gateway, upstream: respx.Router, redis: Redis, http_client: httpx.AsyncClient
+) -> None:
+    rollout, fp, _ = await setup(
+        gateway, http_client, redis, audit_rate=1.0, audit_min_samples=8, audit_threshold=0.15
+    )
+    await rollout.set_state(fp, "full", 1.0, actor="test", reason="go")
+    for url in (LLAMA_URL, GROQ_URL):
+        upstream.post(url).mock(
+            return_value=httpx.Response(200, json=openai_completion("card_arrival"))
+        )
+    for i in range(12):
+        await gateway.client.post("/v1/chat/completions", json=body(f"q{i}"))
+        await asyncio.sleep(0.05)
+    await rollout.close()
+    assert (await redis.hget(task_key(fp), "state")) == b"full"
+    stats = await rollout.stats(fp)
+    assert stats["audit_n"] == 12 and stats["audit_disagree"] == 0

@@ -1,4 +1,6 @@
--- Record one distilled request's outcome and roll back atomically if quality dropped.
+-- Record one distilled outcome and roll back atomically if quality dropped. Used for two
+-- independent windows: online validity failures, and sampled audit disagreements with the
+-- strong model (rollout.py); each passes its own counters key, minimum and threshold.
 -- KEYS[1] task hash (state, weight, ...), KEYS[2] per-minute counters hash (field "<min>:n" / "<min>:f")
 -- ARGV[1] failed (0/1), ARGV[2] window minutes, ARGV[3] min samples, ARGV[4] failure threshold,
 -- ARGV[5] z (1.96 for a 95% Wilson bound)

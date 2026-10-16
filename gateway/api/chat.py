@@ -216,6 +216,8 @@ async def _check_distilled(
     await rollout.record(decision.task, ok)
     if ok or not served_distilled:  # not served_distilled: a fallback already used the strong model
         call.guards.distill_outcome = "served" if ok else "fallback"
+        if ok:
+            rollout.audit(decision.task, body, text)  # sampled, in the background
         return response
     call.guards.distill_outcome = "fallback"
     call.trace.spec = container.registry.get(decision.task.source_alias)
