@@ -8,5 +8,12 @@ export REPLAY_BASE_URL=http://replay-llm:9100/v1
 export LLAMACPP_BASE_URL=http://llamacpp:8080/v1
 export DISTILL_ROLLOUT_ENABLED=true
 export DISTILL_MODELS_DIR="${DISTILL_MODELS_DIR:-$HOME/distill-models}"
+# Which distilled model llama.cpp serves: data/distill/SERVING ("<task>/<version>"), written by
+# the pipeline's serve step. Without it, every redeploy would fall back to compose's default.
+if [ -f data/distill/SERVING ]; then
+  DISTILLED_MODEL="$(tr -d '[:space:]' < data/distill/SERVING)"
+  export DISTILLED_MODEL
+  export DISTILLED_ALIAS="${DISTILLED_MODEL//\//-}"
+fi
 docker compose --profile distill up -d --no-build
 docker compose restart nginx  # it resolves replica IPs at startup
