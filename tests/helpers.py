@@ -265,3 +265,24 @@ class KeywordEmbedder:
     def embed(self, texts: Sequence[str]) -> list[list[float]]:
         self.calls += 1
         return [[1.0, 0.0] if any(w in t.lower() for w in self.HARD) else [0.0, 1.0] for t in texts]
+
+
+async def warm_redis_pool(redis: Any, connections: int = 48) -> None:
+    """Open `connections` pooled Redis connections before a concurrency test's burst.
+
+    Opening ~100 brand-new connections at once through Docker Desktop's port proxy sometimes
+    times out on connect (measured: 3 of 300 in 1 of 10 bursts). The gateway would then fail
+    open (cache) or closed (limits) exactly as designed, but the test would be measuring Docker
+    networking, not coordination. A long-running gateway reuses warm pools; so do the tests.
+    """
+    import asyncio
+
+    from redis.exceptions import RedisError
+
+    for attempt in range(5):
+        try:
+            await asyncio.gather(*(redis.ping() for _ in range(connections)))
+            return
+        except RedisError:
+            await asyncio.sleep(0.2 * (attempt + 1))
+    raise RuntimeError("could not warm the Redis connection pool")

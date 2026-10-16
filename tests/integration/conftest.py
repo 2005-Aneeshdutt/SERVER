@@ -24,7 +24,7 @@ from gateway.providers.factory import build_providers
 from gateway.routing.breaker import BreakerConfig, RedisCircuitBreaker
 from gateway.routing.registry import ModelRegistry
 from tests.conftest import ROOT
-from tests.helpers import FakeKeyStore, MemorySink, no_sleep
+from tests.helpers import FakeKeyStore, MemorySink, no_sleep, warm_redis_pool
 
 
 class ZeroLedger:
@@ -56,6 +56,7 @@ async def replicas() -> AsyncIterator[tuple[Replicas, respx.Router]]:
             clients = []
             for _ in range(count):
                 redis = Redis.from_url(settings.redis_url)
+                await warm_redis_pool(redis)
                 stack.push_async_callback(redis.aclose)
                 http = httpx.AsyncClient(transport=httpx.MockTransport(upstream.async_handler))
                 providers = build_providers(settings, http)

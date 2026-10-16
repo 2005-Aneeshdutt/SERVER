@@ -15,6 +15,7 @@ from gateway.core.errors import SpendCapExceeded
 from gateway.limits.ratelimit import RedisRateLimiter
 from gateway.limits.spend import RedisSpendLimiter, from_nanos
 from gateway.observability.metrics import SPEND_SETTLE_FAILURES
+from tests.helpers import warm_redis_pool
 
 pytestmark = pytest.mark.integration
 
@@ -190,6 +191,8 @@ async def test_concurrent_reservations_never_exceed_cap(redis: Redis) -> None:
         RedisSpendLimiter(Redis.from_url(Settings().redis_url), ledger, 60) for _ in range(5)
     ]
     key = record(cap=Decimal(1))
+    for limiter in limiters:
+        await warm_redis_pool(limiter._redis, 24)
     results = await asyncio.gather(
         *(limiters[i % 5].reserve(key, f"r{i}", Decimal("0.07")) for i in range(100)),
         return_exceptions=True,
