@@ -1,6 +1,6 @@
 # PLAN: closed-loop distillation (M5–M12)
 
-Status: approved. **M5 done**; **M6-M10 built on a fast path** (ADR 0016: one task, one teacher, CPU training, no LLM judge). Results: `distill/RESULTS.md`. M11-M12 not started.
+Status: **paused after M5-M12 were built** (ADR 0015, ADR 0016). M5-M10 ran end to end on simulated traffic (results: `distill/RESULTS.md`; no model has passed the gate yet). M11 (pipeline) and M12 (drift demo, sampled-audit rollback) are built and tested, not yet run on full data. Remaining runs: see README "Future work".
 
 The goal: the gateway mines its own traffic and finds narrow, repeated tasks sent to an
 expensive model. For each one it:

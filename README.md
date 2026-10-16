@@ -1,7 +1,14 @@
-# LLM Gateway
+# Switchyard
 
-An OpenAI-compatible gateway that sits between apps and LLM providers. Apps point any OpenAI SDK
-at it. The gateway handles auth, provider translation, streaming, timeouts and cost/latency
+**An OpenAI-compatible AI gateway that routes, protects and learns:** failover across providers,
+per-key spend caps that can't be overspent, caching, smart routing, and self-distilled small
+models rolled out with statistical gates and automatic rollback.
+
+Apps keep the standard OpenAI SDK and change one URL. Behind that one format, Switchyard reaches
+Groq, Gemini, Anthropic, OpenAI, OpenRouter, local Ollama models and its own distilled models
+served by llama.cpp, translating each provider's native API.
+
+In detail, Switchyard handles auth, provider translation, streaming, timeouts and cost/latency
 logging, plus retries, fallback chains, a shared circuit breaker, per-key rate limits and
 spend caps, a response cache with request coalescing, and `model: "auto"` routing between a
 cheap and a strong model. It ships with a web **playground** and an operator **dashboard**.
@@ -323,6 +330,16 @@ Tests mock all provider HTTP with `respx`. No real API calls happen in tests or 
 | **M4:** playground, dashboard, kill switch, demo keys | done; see screenshots above |
 | **M5:** traffic capture (Kafka, Postgres + Parquet), PII scrubbing, opt-in, simulated-traffic replayer | done; see "Distillation" above |
 | **M6-M10:** discovery, dataset, CPU LoRA training, llama.cpp serving, eval gate, shadow/canary/full rollout with auto-rollback | built and running; best model ties the strong model but the gate (underpowered) hasn't passed it, so it runs in shadow only |
+| **M11:** one-command, resumable pipeline (`python -m distill.pipeline run <task>`) | built and unit-tested; not yet run end to end on the full 77-intent data |
+| **M12:** drift demo (`python -m distill.drift_demo <task>`) + sampled-audit rollback | audit rollback built and integration-tested; drift demo script built, not yet run (needs a model in canary/full) |
+
+### Future work (paused here on purpose)
+The remaining steps are runs, not features, and they're paced by free-tier quotas:
+1. Finish collecting the 77-intent Banking77 traffic (~1,000 free Groq requests/day).
+2. Run the pipeline for v4 and the gate on a properly sized test set.
+3. If it passes: canary, then full, with the measured cost-per-request payoff.
+4. Run the drift demo and re-run the 3-replica load test with capture and rollout enabled.
+5. Host a public demo (`scripts/public-demo.ps1` already works locally).
 
 ### M1 verification
 - The official OpenAI SDK runs against the gateway (streaming and non-streaming) in tests with
