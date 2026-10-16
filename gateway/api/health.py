@@ -41,6 +41,9 @@ async def readyz(request: Request, container: ContainerDep) -> JSONResponse:
         "draining": draining,
         "degraded": any(v != "ok" for v in checks.values()),
         "checks": checks,
+        # Informational (never affects readiness): lets the traffic replayer refuse to send
+        # requests that wouldn't be captured.
+        "capture_enabled": container.capture is not None,
     }
     return JSONResponse(body, status_code=503 if draining else 200)
 

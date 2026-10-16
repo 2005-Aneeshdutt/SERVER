@@ -372,6 +372,7 @@ async def test_readyz_reports_dependencies_but_only_fails_when_draining(
         "draining": False,
         "degraded": True,
         "checks": {"postgres": "ok", "redis": "error: ConnectionError"},
+        "capture_enabled": False,  # informational only
     }
     gateway.app.state.draining = True
     assert (await gateway.client.get("/readyz")).status_code == 503
