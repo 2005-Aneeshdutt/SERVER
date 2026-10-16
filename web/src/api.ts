@@ -83,6 +83,8 @@ export interface ChatResult {
   /** "length" means the answer was cut off by max_tokens. */
   finishReason?: string;
   error?: string;
+  /** OpenAI-style error code from the gateway (e.g. provider_unavailable, spend_cap_exceeded). */
+  errorCode?: string;
   totalMs: number;
   ttftMs?: number;
   provider?: string;
@@ -142,7 +144,7 @@ interface StreamEvent {
   }[];
   usage?: { prompt_tokens: number; completion_tokens: number };
   x_gateway?: { cost_usd: string };
-  error?: { message?: string };
+  error?: { message?: string; code?: string };
 }
 
 function fromHeaders(res: Response): Partial<ChatResult> {
@@ -212,6 +214,7 @@ export async function chat(
   if (!res.ok) {
     const err = (await res.json().catch(() => null)) as StreamEvent | null;
     result.error = err?.error?.message ?? `${res.status} ${res.statusText}`;
+    result.errorCode = err?.error?.code;
   } else if (opts.stream && res.body) {
     await readStream(res.body, result, started, onText);
   } else {

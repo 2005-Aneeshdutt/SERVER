@@ -30,9 +30,22 @@ const ICONS = {
   stream: <IconZap size={14} />,
 };
 
+/** Gateway error codes raised after the request passed auth and limits: the provider failed
+ * (after retries and fallbacks). Error responses don't carry the attempts header, so the code
+ * is what tells "rejected at the door" apart from "the provider failed". */
+const PROVIDER_ERRORS = new Set([
+  "provider_unavailable",
+  "provider_timeout",
+  "upstream_rate_limited",
+  "upstream_auth_failed",
+  "upstream_bad_request",
+  "no_provider_available",
+]);
+
 function finishedStages(r: ChatResult, streamed: boolean): Stage[] {
   const hit = r.cache === "HIT";
-  const rejected = !r.ok && r.attempts === 0 && !hit;
+  const providerFailed = !r.ok && PROVIDER_ERRORS.has(r.errorCode ?? "");
+  const rejected = !r.ok && !providerFailed && r.attempts === 0 && !hit;
   const auth: Stage = {
     id: "auth",
     label: "Auth & limits",
@@ -63,7 +76,9 @@ function finishedStages(r: ChatResult, streamed: boolean): Stage[] {
       ? "not called"
       : r.fallbacks > 0
         ? `${r.provider ?? "?"} · ${r.fallbacks} fallback${r.fallbacks > 1 ? "s" : ""}`
-        : (r.provider ?? (rejected ? "not reached" : "—")),
+        : providerFailed
+          ? "failed after retries"
+          : (r.provider ?? (rejected ? "not reached" : "—")),
     state: rejected ? "pending" : hit ? "skip" : !r.ok ? "bad" : r.fallbacks > 0 ? "warn" : "done",
     icon: ICONS.provider,
   };
