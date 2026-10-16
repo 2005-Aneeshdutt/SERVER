@@ -50,7 +50,7 @@ def create_app(
             for close in container.closers:
                 await close()
 
-    app = FastAPI(title="LLM Gateway", version="0.1.0", lifespan=lifespan)
+    app = FastAPI(title="Switchyard", version="0.1.0", lifespan=lifespan)
     app.include_router(chat.router)
     app.include_router(models.router)
     app.include_router(health.router)

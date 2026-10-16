@@ -508,99 +508,6 @@ wheels = [
 ]
 
 [[package]]
-name = "llm-gateway"
-version = "0.1.0"
-source = { editable = "." }
-dependencies = [
-    { name = "alembic" },
-    { name = "asyncpg" },
-    { name = "fastapi" },
-    { name = "httpx" },
-    { name = "prometheus-client" },
-    { name = "pydantic" },
-    { name = "pydantic-settings" },
-    { name = "pyyaml" },
-    { name = "redis" },
-    { name = "sniffio" },
-    { name = "sqlalchemy", extra = ["asyncio"] },
-    { name = "tiktoken" },
-    { name = "uvicorn", extra = ["standard"] },
-]
-
-[package.optional-dependencies]
-capture = [
-    { name = "aiokafka" },
-]
-router = [
-    { name = "sentence-transformers" },
-    { name = "torch", version = "2.14.1", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'darwin'" },
-    { name = "torch", version = "2.14.1+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform != 'darwin'" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "mypy" },
-    { name = "openai" },
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
-    { name = "respx" },
-    { name = "ruff" },
-    { name = "types-pyyaml" },
-]
-distill = [
-    { name = "aiokafka" },
-    { name = "pyarrow" },
-]
-eval = [
-    { name = "scikit-learn" },
-]
-train = [
-    { name = "peft" },
-    { name = "transformers" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "aiokafka", marker = "extra == 'capture'", specifier = ">=0.11" },
-    { name = "alembic", specifier = ">=1.13" },
-    { name = "asyncpg", specifier = ">=0.29" },
-    { name = "fastapi", specifier = ">=0.115" },
-    { name = "httpx", specifier = ">=0.27" },
-    { name = "prometheus-client", specifier = ">=0.20" },
-    { name = "pydantic", specifier = ">=2.8" },
-    { name = "pydantic-settings", specifier = ">=2.4" },
-    { name = "pyyaml", specifier = ">=6.0" },
-    { name = "redis", specifier = ">=5.0" },
-    { name = "sentence-transformers", marker = "extra == 'router'", specifier = ">=3.0" },
-    { name = "sniffio", specifier = ">=1.3" },
-    { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0.30" },
-    { name = "tiktoken", specifier = ">=0.7" },
-    { name = "torch", marker = "extra == 'router'", specifier = ">=2.4", index = "https://download.pytorch.org/whl/cpu" },
-    { name = "uvicorn", extras = ["standard"], specifier = ">=0.30" },
-]
-provides-extras = ["router", "capture"]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "mypy", specifier = ">=1.11" },
-    { name = "openai", specifier = ">=1.40" },
-    { name = "pytest", specifier = ">=8.3" },
-    { name = "pytest-asyncio", specifier = ">=0.24" },
-    { name = "respx", specifier = ">=0.21" },
-    { name = "ruff", specifier = ">=0.6" },
-    { name = "types-pyyaml", specifier = ">=6.0" },
-]
-distill = [
-    { name = "aiokafka", specifier = ">=0.11" },
-    { name = "pyarrow", specifier = ">=17" },
-]
-eval = [{ name = "scikit-learn", specifier = ">=1.5" }]
-train = [
-    { name = "peft", specifier = ">=0.12" },
-    { name = "transformers", specifier = ">=4.44" },
-]
-
-[[package]]
 name = "mako"
 version = "1.4.3"
 source = { registry = "https://pypi.org/simple" }
@@ -1225,6 +1132,99 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/7b/2b/3850dc6bf7ef71b088962eba31dafc6cffd2f96e577ebb0bb316df96da3e/starlette-1.7.0.tar.gz", hash = "sha256:c79f74ea63cff761804fbbfb182f1e0b440c2d07b164d24700c5a1bab5d6ff5d", size = 2736246, upload-time = "2026-09-23T07:30:26.35Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/4e/d6/1ec1b290f9e0fb067899b61e1d37a30c923068bad260b216dbe37a7d2967/starlette-1.7.0-py3-none-any.whl", hash = "sha256:67f8e99895493dd2911a03f11314af6ceebeae4e704bb9f43dfc6a9db151c93e", size = 78980, upload-time = "2026-09-23T07:30:24.567Z" },
+]
+
+[[package]]
+name = "switchyard"
+version = "0.1.0"
+source = { editable = "." }
+dependencies = [
+    { name = "alembic" },
+    { name = "asyncpg" },
+    { name = "fastapi" },
+    { name = "httpx" },
+    { name = "prometheus-client" },
+    { name = "pydantic" },
+    { name = "pydantic-settings" },
+    { name = "pyyaml" },
+    { name = "redis" },
+    { name = "sniffio" },
+    { name = "sqlalchemy", extra = ["asyncio"] },
+    { name = "tiktoken" },
+    { name = "uvicorn", extra = ["standard"] },
+]
+
+[package.optional-dependencies]
+capture = [
+    { name = "aiokafka" },
+]
+router = [
+    { name = "sentence-transformers" },
+    { name = "torch", version = "2.14.1", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'darwin'" },
+    { name = "torch", version = "2.14.1+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform != 'darwin'" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "mypy" },
+    { name = "openai" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "respx" },
+    { name = "ruff" },
+    { name = "types-pyyaml" },
+]
+distill = [
+    { name = "aiokafka" },
+    { name = "pyarrow" },
+]
+eval = [
+    { name = "scikit-learn" },
+]
+train = [
+    { name = "peft" },
+    { name = "transformers" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "aiokafka", marker = "extra == 'capture'", specifier = ">=0.11" },
+    { name = "alembic", specifier = ">=1.13" },
+    { name = "asyncpg", specifier = ">=0.29" },
+    { name = "fastapi", specifier = ">=0.115" },
+    { name = "httpx", specifier = ">=0.27" },
+    { name = "prometheus-client", specifier = ">=0.20" },
+    { name = "pydantic", specifier = ">=2.8" },
+    { name = "pydantic-settings", specifier = ">=2.4" },
+    { name = "pyyaml", specifier = ">=6.0" },
+    { name = "redis", specifier = ">=5.0" },
+    { name = "sentence-transformers", marker = "extra == 'router'", specifier = ">=3.0" },
+    { name = "sniffio", specifier = ">=1.3" },
+    { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0.30" },
+    { name = "tiktoken", specifier = ">=0.7" },
+    { name = "torch", marker = "extra == 'router'", specifier = ">=2.4", index = "https://download.pytorch.org/whl/cpu" },
+    { name = "uvicorn", extras = ["standard"], specifier = ">=0.30" },
+]
+provides-extras = ["router", "capture"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "mypy", specifier = ">=1.11" },
+    { name = "openai", specifier = ">=1.40" },
+    { name = "pytest", specifier = ">=8.3" },
+    { name = "pytest-asyncio", specifier = ">=0.24" },
+    { name = "respx", specifier = ">=0.21" },
+    { name = "ruff", specifier = ">=0.6" },
+    { name = "types-pyyaml", specifier = ">=6.0" },
+]
+distill = [
+    { name = "aiokafka", specifier = ">=0.11" },
+    { name = "pyarrow", specifier = ">=17" },
+]
+eval = [{ name = "scikit-learn", specifier = ">=1.5" }]
+train = [
+    { name = "peft", specifier = ">=0.12" },
+    { name = "transformers", specifier = ">=4.44" },
 ]
 
 [[package]]

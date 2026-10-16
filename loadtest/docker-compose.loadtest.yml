@@ -19,7 +19,7 @@ services:
         condition: service_started
 
   mock-llm:
-    image: llm-gateway:local  # same image as the gateway; only the command differs
+    image: switchyard:local  # same image as the gateway; only the command differs
     command: ["uvicorn", "mock_llm:app", "--app-dir", "/loadtest", "--host", "0.0.0.0", "--port", "9000", "--workers", "4", "--no-access-log"]
     volumes:
       - ./loadtest:/loadtest:ro

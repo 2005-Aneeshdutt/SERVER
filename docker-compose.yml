@@ -4,7 +4,7 @@
 services:
   nginx:
     # Edge: the React UI plus the load balancer in front of the gateway replicas.
-    image: llm-gateway-web:local
+    image: switchyard-web:local
     build:
       context: .
       dockerfile: docker/nginx/Dockerfile
@@ -15,7 +15,7 @@ services:
 
   api:
     # api and migrate share one image tag, so migrations always match the code.
-    image: llm-gateway:local
+    image: switchyard:local
     build: .
     env_file:
       - path: .env
@@ -52,7 +52,7 @@ services:
         condition: service_healthy
 
   migrate:
-    image: llm-gateway:local
+    image: switchyard:local
     build: .
     command: ["alembic", "upgrade", "head"]
     environment:
@@ -145,7 +145,7 @@ services:
 
   capture-consumer:
     # Kafka -> Postgres (metadata) + Parquet (content, opted-in keys only) in ./data/capture.
-    image: llm-gateway:local
+    image: switchyard:local
     profiles: ["distill"]
     command: ["python", "-m", "distill.consumer"]
     environment:
@@ -198,7 +198,7 @@ services:
   distill-tools:
     # Offline distillation commands against the captured data, e.g.
     #   docker compose --profile distill run --rm distill-tools python -m distill.report
-    image: llm-gateway:local
+    image: switchyard:local
     profiles: ["distill"]
     # No-op by default: `--profile distill up` starts every profile service, and the report
     # must only run when asked (it rewrites distill/RESULTS.md). Run real commands with `run`.
@@ -219,7 +219,7 @@ services:
 
   replay-llm:
     # Recorded answers for simulated noise traffic (no model is called).
-    image: llm-gateway:local
+    image: switchyard:local
     profiles: ["distill"]
     command: ["uvicorn", "distill.replay_llm:app", "--host", "0.0.0.0", "--port", "9100", "--no-access-log"]
     environment:

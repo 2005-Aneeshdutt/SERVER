@@ -12,6 +12,6 @@ context() {
       --exclude=./eval/data --exclude=./data --exclude=./loadtest/results --exclude='*/__pycache__' -cf - .
 }
 
-context | docker build -t llm-gateway:local -f Dockerfile -
-context | docker build -t llm-gateway-web:local -f docker/nginx/Dockerfile -
-echo "built llm-gateway:local and llm-gateway-web:local; start with: docker compose up -d --no-build"
+context | docker build -t switchyard:local -f Dockerfile -
+context | docker build -t switchyard-web:local -f docker/nginx/Dockerfile -
+echo "built switchyard:local and switchyard-web:local; start with: docker compose up -d --no-build"

@@ -10,4 +10,4 @@ class OpenRouterProvider(OpenAICompatibleProvider):
     def __init__(self, client: httpx.AsyncClient, base_url: str, api_key: str) -> None:
         super().__init__("openrouter", client, base_url, api_key)
         # Optional attribution headers (https://openrouter.ai/docs/api-reference/overview).
-        self._headers["X-Title"] = "LLM Gateway"
+        self._headers["X-Title"] = "Switchyard"

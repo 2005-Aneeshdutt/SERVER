@@ -10,7 +10,7 @@ log = logging.getLogger(__name__)
 
 
 class KafkaSender:
-    def __init__(self, bootstrap: str, client_id: str = "llm-gateway") -> None:
+    def __init__(self, bootstrap: str, client_id: str = "switchyard") -> None:
         self._bootstrap = bootstrap
         self._client_id = client_id
         self._producer: Any = None
